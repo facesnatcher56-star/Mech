@@ -1,8 +1,7 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/projectile.gd" id="1_script"]
-[ext_resource type="PackedScene" uid="uid://0rh18w3on25x" path="res://assets/prefabs/Testbullet.glb" id="2_mesh"]
-[ext_resource type="Material" path="res://materials/gold_shell.tres" id="3_material"]
+[ext_resource type="PackedScene" uid="uid://c1m3bpvfqqam5" path="res://assets/prefabs/testshell.glb" id="2_testshell"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.1
@@ -11,7 +10,7 @@ height = 0.8
 [node name="TracerShell" type="Area3D"]
 script = ExtResource("1_script")
 
-[node name="Testbullet" parent="." instance=ExtResource("2_mesh")]
+[node name="testshell" parent="." instance=ExtResource("2_testshell")]
 transform = Transform3D(0.5, 0, 0, 0, -2.18557e-08, 0.5, 0, -0.5, -2.18557e-08, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]

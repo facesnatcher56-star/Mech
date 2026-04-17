@@ -1,73 +1,55 @@
 extends Node3D
 
-@export var speed: float = 1.8
-@export var patrol_distance: float = 12.0
-
 const PROJECTILE = preload("res://scenes/projectile.tscn")
 
 var start_pos: Vector3
-var direction: float = 1.0
-var time_passed: float = 0.0
 var is_staggered: bool = false
 var stagger_count: int = 0
+var armor: int = 1 # One-hit kill
+
+@onready var body = get_node_or_null("Body")
+@onready var left_leg = get_node_or_null("Body/LeftLeg")
+@onready var right_leg = get_node_or_null("Body/RightLeg")
 
 func _ready():
+	add_to_group("enemy")
 	start_pos = position
-	
-	# Automated Return Fire Timer (Every 5 seconds)
-	var timer = Timer.new()
-	timer.wait_time = 5.0
-	timer.autostart = true
-	timer.timeout.connect(fire_at_player)
-	add_child(timer)
 
 func _physics_process(delta):
-	if is_staggered:
-		return
-		
-	position.x += speed * direction * delta
-	
-	if abs(position.x - start_pos.x) >= patrol_distance:
-		direction *= -1.0
-		position.x = start_pos.x + (patrol_distance * -direction)
-	
-	time_passed += delta
-	var bob_frequency = 3.5
-	var bob_intensity = 0.08
-	position.y = start_pos.y + abs(sin(time_passed * bob_frequency)) * bob_intensity
+	if armor <= 0: return
+
+	# --- Ground Alignment ---
+	var space_state = get_world_3d().direct_space_state
+	var ground_query = PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 2.0, global_position + Vector3.DOWN * 5.0)
+	var ground_res = space_state.intersect_ray(ground_query)
+	if ground_res:
+		global_position.y = ground_res.position.y + 0.05
 
 func fire_at_player():
-	if is_staggered:
-		return
-		
-	# Find the player in the scene
-	var player = get_tree().get_first_node_in_group("player")
-	if not player:
-		return
-		
-	# 1. Instantiate projectile
-	var shell = PROJECTILE.instantiate()
-	shell.shooter = self
-	get_tree().root.add_child(shell)
-	
-	# 2. Position it at the enemy's center (Elevated to match player head height)
-	shell.global_position = global_position + Vector3(0, 2.5, 0)
-	
-	# 3. Aim it directly at the player cockpit
-	var target_pos = player.global_position + Vector3(0, 1.2, 0)
-	shell.look_at(target_pos)
+	# Firing disabled
+	pass
 
 func hit():
-	stagger_count += 1
-	var current_stagger_id = stagger_count
+	# The individual parts will handle their own hits via the projectile
+	pass
+
+func part_destroyed(part: Node3D):
+	print("Parent mech notified: " + part.part_name + " destroyed!")
+	if part.is_vital:
+		destroy_completely()
+
+func destroy_completely():
+	if armor <= 0: return
+	armor = 0
+	print("ENEMY DESTROYED!")
 	
-	print("ENEMY: Hit received! Staggering... (ID: ", current_stagger_id, ")")
-	is_staggered = true
+	var explosion_scene = preload("res://scenes/explosion.tscn")
+	var explosion = explosion_scene.instantiate()
+	get_tree().root.add_child(explosion)
+	explosion.global_position = global_position + Vector3(0, 1.0, 0)
 	
-	await get_tree().create_timer(1.5).timeout
+	# Hide everything
+	visible = false
 	
-	if current_stagger_id == stagger_count:
-		print("ENEMY: Resuming patrol.")
-		is_staggered = false
-	else:
-		print("ENEMY: Stagger extended by fresh hit.")
+	# Cleanup
+	get_tree().create_timer(2.0).timeout.connect(queue_free)

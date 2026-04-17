@@ -1,70 +1,272 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene format=3 uid="uid://c7x55cxyx5apg"]
 
-[ext_resource type="Script" path="res://scripts/mech_cockpit.gd" id="2_script"]
-[ext_resource type="Environment" path="res://environments/industrial_atmosphere.tres" id="1_env"]
-[ext_resource type="ParticleProcessMaterial" path="res://materials/steam_process.tres" id="3_particles"]
-[ext_resource type="StandardMaterial3D" path="res://materials/steam_draw_pass.tres" id="4_material"]
-[ext_resource type="Script" path="res://scripts/reticle.gd" id="5_reticle"]
-[ext_resource type="PackedScene" path="res://scenes/enemy_mech.tscn" id="6_enemy"]
+[ext_resource type="Script" uid="uid://12nt8ueoo01w" path="res://scripts/enemy_patrol.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://w6va1rgf58ga" path="res://scripts/mech_cockpit.gd" id="2_script"]
+[ext_resource type="Script" uid="uid://td008qdv2i6o" path="res://scripts/world_setup.gd" id="7_world_setup"]
+[ext_resource type="Texture2D" uid="uid://bxaxqejxo5v3y" path="res://assets/VFX/Smoke/PNG/Black smoke/blackSmoke00.png" id="7_ya4ey"]
+[ext_resource type="AudioStream" uid="uid://ddi2a7fhrh6op" path="res://assets/Sounds/artillery-gunfire2.wav" id="9_sound"]
+[ext_resource type="AudioStream" uid="uid://be0jrnu46vh5o" path="res://assets/Sounds/hittest.wav" id="10_hit_sound"]
+[ext_resource type="AudioStream" uid="uid://oreh37081cl" path="res://assets/Sounds/incoming-mortar-1.wav" id="11_miss_sound"]
+[ext_resource type="Script" uid="uid://1qrwwxfyoar1" path="res://scripts/cinematic_ui.gd" id="12_cinematic_ui"]
+[ext_resource type="PackedScene" uid="uid://vu0timr6x06f" path="res://assets/prefabs/zezlan.glb" id="13_trceg"]
+[ext_resource type="PackedScene" uid="uid://clruu6ywi6t5" path="res://assets/prefabs/WIPtestmech.glb" id="14_a8y0u"]
+[ext_resource type="Script" uid="uid://dgjcwck85kac5" path="res://scripts/directional_smoke.gd" id="15_directional_smoke"]
+[ext_resource type="Script" uid="uid://b3gcats3yakje" path="res://scripts/analog_reticle_hud.gd" id="16_analog_reticle"]
+[ext_resource type="Script" uid="uid://btwbp00nt72jd" path="res://scripts/combat_bark_ui.gd" id="17_bark_ui"]
 
-[sub_resource type="QuadMesh" id="QuadMesh_1"]
-material = ExtResource("4_material")
-size = Vector2(0.5, 0.5)
+[sub_resource type="SphereMesh" id="SphereMesh_ref"]
+radius = 0.1
+height = 0.2
 
-[node name="Main" type="Node3D"]
+[sub_resource type="Gradient" id="Gradient_trceg"]
+offsets = PackedFloat32Array(0, 0.1, 0.5, 1, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.114, 1, 1, 1, 0.0798, 1, 1, 1, 1, 1, 1, 1, 0)
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = ExtResource("1_env")
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_a8y0u"]
+gradient = SubResource("Gradient_trceg")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.707107, -0.5, 0.5, 0, 0.707107, 0.707107, -0.707107, -0.5, 0.5, 0, 5, 0)
-light_color = Color(0.8, 0.85, 1, 1)
-light_energy = 0.4
-shadow_enabled = true
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_a8y0u"]
+direction = Vector3(-1, 10, 0)
+spread = 12.432
+initial_velocity_min = 0.1
+initial_velocity_max = 1.0
+gravity = Vector3(0, 0.4, 0)
+damping_min = 4.0
+damping_max = 6.0
+scale_min = 1.5
+scale_max = 3.0
+color_ramp = SubResource("GradientTexture1D_a8y0u")
 
-[node name="EnemyMech" parent="." instance=ExtResource("6_enemy")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, -20)
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_jkv2x"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("7_ya4ey")
+billboard_mode = 3
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
 
-[node name="Cockpit" type="Node3D" parent="."]
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+material = SubResource("StandardMaterial3D_jkv2x")
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_leg"]
+size = Vector3(0.25, 0.8, 0.25)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bark"]
+bg_color = Color(0, 0, 0, 0.85)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.3, 0.3, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="LabelSettings" id="LabelSettings_bark"]
+font_size = 22
+font_color = Color(0.9, 0.9, 0.9, 1)
+
+[sub_resource type="LabelSettings" id="LabelSettings_name"]
+font_size = 14
+font_color = Color(0.5, 0.5, 0.5, 1)
+
+[node name="Main" type="Node3D" unique_id=2077343884]
+
+[node name="REF_Alpha" type="Marker3D" parent="." unique_id=1714902305]
+transform = Transform3D(0.9999827, -0.005436452, -0.0022313918, 0.005442314, 0.99998176, 0.0026287884, 0.002217057, -0.002640889, 0.99999404, 15.83988, 0, 149.09521)
+gizmo_extents = 0.5
+
+[node name="Dot" type="MeshInstance3D" parent="REF_Alpha" unique_id=1936452529]
+mesh = SubResource("SphereMesh_ref")
+
+[node name="REF_Beta" type="Marker3D" parent="." unique_id=1382963939]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.3858, 0, 149.18222)
+gizmo_extents = 0.5
+
+[node name="Dot" type="MeshInstance3D" parent="REF_Beta" unique_id=233014793]
+transform = Transform3D(0.9990596, 0, 0.043357834, 0, 1, 0, -0.043357834, 0, 0.9990596, 0, 0, 0)
+mesh = SubResource("SphereMesh_ref")
+
+[node name="REF_Gamma" type="Marker3D" parent="." unique_id=490024293]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.428871, 10.804161, 150.6296)
+gizmo_extents = 0.5
+
+[node name="Dot" type="MeshInstance3D" parent="REF_Gamma" unique_id=1969197083]
+mesh = SubResource("SphereMesh_ref")
+
+[node name="REF_Charlie" type="Marker3D" parent="." unique_id=757398534]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.836662, 2.2753994, 149.66739)
+gizmo_extents = 0.5
+
+[node name="Dot" type="MeshInstance3D" parent="REF_Charlie" unique_id=1921384776]
+mesh = SubResource("SphereMesh_ref")
+
+[node name="WorldSetup" type="Node" parent="." unique_id=812988922]
+script = ExtResource("7_world_setup")
+
+[node name="WIPtestmech" parent="." unique_id=1679724251 instance=ExtResource("14_a8y0u")]
+transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 27.274748, 3.252451, -13.861531)
 script = ExtResource("2_script")
+guncam_duration = 1.0
+miss_timeout = 1.0
 
-[node name="Camera3D" type="Camera3D" parent="Cockpit"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
-current = true
-fov = 75.0
-
-[node name="DashboardBase" type="CSGBox3D" parent="Cockpit"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, -0.4)
-use_collision = true
-size = Vector3(1.5, 0.1, 0.6)
-
-[node name="WindowFrame" type="CSGBox3D" parent="Cockpit"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, -0.8)
-use_collision = true
-size = Vector3(2.5, 2, 0.1)
-
-[node name="WindowHole" type="CSGBox3D" parent="Cockpit/WindowFrame"]
-operation = 2
-size = Vector3(2, 1.2, 0.2)
-
-[node name="SteamParticles" type="GPUParticles3D" parent="Cockpit"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.85, -0.3)
+[node name="DirectionalSmoke" type="GPUParticles3D" parent="WIPtestmech/Armature" parent_id_path=PackedInt32Array(1679724251, 359783737) index="0" unique_id=641991123]
+transform = Transform3D(0.19957677, 0.7852611, -0.5861179, -0.96918815, 0.24632244, 0, 0.14437394, 0.5680583, 0.8102258, 0.7875495, 0.72992843, -0.87243533)
 emitting = false
-amount = 25
-lifetime = 1.5
+amount = 40
+lifetime = 0.8
 one_shot = true
-explosiveness = 0.9
-fixed_fps = 30
-process_material = ExtResource("3_particles")
-draw_pass_1 = SubResource("QuadMesh_1")
+speed_scale = 0.58
+explosiveness = 1.0
+use_fixed_seed = true
+seed = 2470867168
+visibility_aabb = AABB(-100, -100, -100, 200, 200, 200)
+process_material = SubResource("ParticleProcessMaterial_a8y0u")
+draw_pass_1 = SubResource("QuadMesh_smoke")
+script = ExtResource("15_directional_smoke")
+shoot_direction = Vector3(-1, 10, 0)
+cone_spread = 12.432
+initial_velocity = 1.0
+smoke_opacity = 0.114
+linger_time = 0.8
+smoke_scale = 3.0
+particle_amount = 40
 
-[node name="CanvasLayer" type="CanvasLayer" parent="Cockpit"]
+[node name="RightArm" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm" parent_id_path=PackedInt32Array(1679724251, 914604739) index="0" unique_id=1710989070]
+transform = Transform3D(-0.35741854, 0.6914562, -0.62780714, -0.6968309, 0.25013238, 0.67220604, 0.6218356, 0.67773414, 0.39242592, -0.015673876, -0.059205055, 0.003597021)
 
-[node name="Reticle" type="Control" parent="Cockpit/CanvasLayer"]
+[node name="CannonSound" type="AudioStreamPlayer3D" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm/RightArm" index="0" unique_id=1645744782]
+transform = Transform3D(0.19999991, -9.536732e-09, 1.6689295e-08, 3.979037e-15, 0.1999999, -3.3378594e-08, -2.3841848e-08, 3.3378594e-08, 0.19999999, -0.21446657, -0.07303512, 0.42657733)
+stream = ExtResource("9_sound")
+unit_size = 50.0
+
+[node name="GunCam_R" type="Camera3D" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm/RightArm" index="1" unique_id=1373230107]
+transform = Transform3D(-0.1939876, 0.021837179, 0.043496106, 0.006679024, 0.1889918, -0.06509551, -0.048209492, -0.06168607, -0.18403979, 0.053593636, 0.10975021, 0.84665203)
+near = 1.0
+far = 2000.0
+
+[node name="FireCam_R" type="Camera3D" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm/RightArm" index="2" unique_id=695871299]
+transform = Transform3D(-0.19939816, 0.014746653, 0.004783049, 0.012502842, 0.1894496, -0.06286859, -0.009166159, -0.06238042, -0.18980154, -0.68504477, -0.012366593, -0.45316386)
+fov = 68.0
+near = 1.0
+far = 2000.0
+
+[node name="RightShoulder" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR" parent_id_path=PackedInt32Array(1679724251, 696837719) index="1" unique_id=931325009]
+transform = Transform3D(-0.7894082, 0.26899937, -0.5517924, -0.26239997, -0.9604829, -0.09284058, -0.5549611, 0.07150111, 0.82879835, 0.035264492, 0.031585455, 0.03621483)
+
+[node name="Collision" type="StaticBody3D" parent="WIPtestmech" unique_id=1915282858]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="Shape" type="CollisionShape3D" parent="WIPtestmech/Collision" unique_id=738984214]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("BoxShape3D_leg")
+
+[node name="Camera3D" type="Camera3D" parent="WIPtestmech" unique_id=1908299830]
+transform = Transform3D(-0.2, 0, -1.7484556e-08, 0, 0.2, 0, 1.7484556e-08, 0, -0.2, 0.34367752, 1.1202359, -1.5891368)
+current = true
+fov = 120.8
+
+[node name="HitSound" type="AudioStreamPlayer3D" parent="WIPtestmech/Camera3D" unique_id=1898408431]
+stream = ExtResource("10_hit_sound")
+unit_size = 50.0
+
+[node name="MissSound" type="AudioStreamPlayer3D" parent="WIPtestmech/Camera3D" unique_id=1754476414]
+stream = ExtResource("11_miss_sound")
+unit_size = 50.0
+
+[node name="CanvasLayer" type="CanvasLayer" parent="WIPtestmech" unique_id=482160378]
+
+[node name="AnalogReticleHUD" type="Control" parent="WIPtestmech/CanvasLayer" unique_id=187178303]
+visible = false
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("5_reticle")
+mouse_filter = 2
+script = ExtResource("16_analog_reticle")
+
+[node name="CombatBarkUI" type="Control" parent="WIPtestmech/CanvasLayer" unique_id=3000000]
+layout_mode = 3
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -300.0
+offset_top = -140.0
+offset_right = 300.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 0
+script = ExtResource("17_bark_ui")
+
+[node name="Panel" type="Panel" parent="WIPtestmech/CanvasLayer/CombatBarkUI" unique_id=1691752393]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bark")
+
+[node name="Label" type="Label" parent="WIPtestmech/CanvasLayer/CombatBarkUI/Panel" unique_id=1578163002]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 30.0
+offset_right = -20.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Fire."
+label_settings = SubResource("LabelSettings_bark")
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="NameLabel" type="Label" parent="WIPtestmech/CanvasLayer/CombatBarkUI/Panel" unique_id=629641424]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 5.0
+offset_right = 150.0
+offset_bottom = 28.0
+text = "[COMM-LINK]"
+label_settings = SubResource("LabelSettings_name")
+
+[node name="DirectorUI" type="Control" parent="WIPtestmech/CanvasLayer" unique_id=2000000]
+layout_mode = 3
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -270.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 600.0
+grow_horizontal = 0
+script = ExtResource("12_cinematic_ui")
+
+[node name="VBox" type="VBoxContainer" parent="WIPtestmech/CanvasLayer/DirectorUI" unique_id=966806640]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="zezlan" parent="." unique_id=523842585 instance=ExtResource("13_trceg")]
+transform = Transform3D(-5, 0, -4.371139e-07, 0, 5, 0, 4.371139e-07, 0, -5, 24.829872, -1.95, 150.16513)
+script = ExtResource("1_script")
+
+[node name="HitBox" type="StaticBody3D" parent="zezlan" unique_id=2142107595 groups=["enemy"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="zezlan/HitBox" unique_id=1045665112]
+shape = SubResource("BoxShape3D_leg")
+
+[editable path="WIPtestmech"]

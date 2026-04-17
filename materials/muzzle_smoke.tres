@@ -1,0 +1,16 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://df7j8lam4l3p2"]
+
+[ext_resource type="Texture2D" uid="uid://bxaxqejxo5v3y" path="res://assets/VFX/Smoke/PNG/Black smoke/blackSmoke00.png" id="1_texture"]
+
+[resource]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_texture")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+proximity_fade_enabled = true
+proximity_fade_distance = 0.5
