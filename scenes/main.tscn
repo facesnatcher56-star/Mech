@@ -1,6 +1,5 @@
 [gd_scene format=3 uid="uid://c7x55cxyx5apg"]
 
-[ext_resource type="Script" uid="uid://12nt8ueoo01w" path="res://scripts/enemy_patrol.gd" id="1_script"]
 [ext_resource type="Script" uid="uid://w6va1rgf58ga" path="res://scripts/mech_cockpit.gd" id="2_script"]
 [ext_resource type="Script" uid="uid://td008qdv2i6o" path="res://scripts/world_setup.gd" id="7_world_setup"]
 [ext_resource type="Texture2D" uid="uid://bxaxqejxo5v3y" path="res://assets/VFX/Smoke/PNG/Black smoke/blackSmoke00.png" id="7_ya4ey"]
@@ -14,6 +13,8 @@
 [ext_resource type="Script" uid="uid://b3gcats3yakje" path="res://scripts/analog_reticle_hud.gd" id="16_analog_reticle"]
 [ext_resource type="Script" uid="uid://btwbp00nt72jd" path="res://scripts/combat_bark_ui.gd" id="17_bark_ui"]
 [ext_resource type="Script" uid="uid://dcd5tt8mgtcoe" path="res://scripts/pause_menu.gd" id="18_pause_menu"]
+[ext_resource type="Script" uid="uid://j3cg73hci5u5" path="res://scripts/zezlan_camera_rig.gd" id="19_zezlan_camera"]
+[ext_resource type="Script" uid="uid://btwpt6uwt6me4" path="res://scripts/zezlan_movement_controller.gd" id="20_zezlan_movement"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_ref"]
 radius = 0.1
@@ -30,12 +31,12 @@ material = SubResource("StandardMaterial3D_aim_target")
 radius = 0.65
 height = 1.3
 
-[sub_resource type="Gradient" id="Gradient_a8y0u"]
+[sub_resource type="Gradient" id="Gradient_jkv2x"]
 offsets = PackedFloat32Array(0, 0.1, 0.5, 1, 1)
 colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.114, 1, 1, 1, 0.0798, 1, 1, 1, 1, 1, 1, 1, 0)
 
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_jkv2x"]
-gradient = SubResource("Gradient_a8y0u")
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_jbj1t"]
+gradient = SubResource("Gradient_jkv2x")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_a8y0u"]
 direction = Vector3(-1, 10, 0)
@@ -47,9 +48,9 @@ damping_min = 4.0
 damping_max = 6.0
 scale_min = 1.5
 scale_max = 3.0
-color_ramp = SubResource("GradientTexture1D_jkv2x")
+color_ramp = SubResource("GradientTexture1D_jbj1t")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_jbj1t"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_muem4"]
 transparency = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true
@@ -60,7 +61,7 @@ particles_anim_v_frames = 1
 particles_anim_loop = false
 
 [sub_resource type="QuadMesh" id="QuadMesh_smoke"]
-material = SubResource("StandardMaterial3D_jbj1t")
+material = SubResource("StandardMaterial3D_muem4")
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_leg"]
 size = Vector3(0.25, 0.8, 0.25)
@@ -88,14 +89,14 @@ font_color = Color(0.5, 0.5, 0.5, 1)
 [node name="Main" type="Node3D" unique_id=2077343884]
 
 [node name="REF_Alpha" type="Marker3D" parent="." unique_id=1714902305]
-transform = Transform3D(0.9999827, -0.005436452, -0.0022313918, 0.005442314, 0.99998176, 0.0026287884, 0.002217057, -0.002640889, 0.99999404, 15.83988, 0, 149.09521)
+transform = Transform3D(0.9999958, -0.0026753985, 0.0010842613, 0.002667536, 0.99997056, 0.007197732, -0.001103496, -0.007194807, 0.9999735, 44.00413, 1.3188925, 129.79524)
 gizmo_extents = 0.5
 
 [node name="Dot" type="MeshInstance3D" parent="REF_Alpha" unique_id=1936452529]
 mesh = SubResource("SphereMesh_ref")
 
 [node name="REF_Beta" type="Marker3D" parent="." unique_id=1382963939]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.3858, 0, 149.18222)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.3858, 0, 127.87355)
 gizmo_extents = 0.5
 
 [node name="Dot" type="MeshInstance3D" parent="REF_Beta" unique_id=233014793]
@@ -110,7 +111,7 @@ gizmo_extents = 0.5
 mesh = SubResource("SphereMesh_ref")
 
 [node name="REF_Charlie" type="Marker3D" parent="." unique_id=757398534]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.836662, 2.2753994, 149.66739)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.836662, 2.2753994, 143.88795)
 gizmo_extents = 0.5
 
 [node name="Dot" type="MeshInstance3D" parent="REF_Charlie" unique_id=1921384776]
@@ -130,6 +131,7 @@ script = ExtResource("7_world_setup")
 transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 27.274748, 3.252451, -13.861531)
 script = ExtResource("2_script")
 guncam_duration = 1.0
+impact_side_camera_time_scale = 0.3
 miss_timeout = 1.0
 
 [node name="DirectionalSmoke" type="GPUParticles3D" parent="WIPtestmech/Armature" parent_id_path=PackedInt32Array(1679724251, 359783737) index="0" unique_id=641991123]
@@ -154,6 +156,12 @@ linger_time = 0.8
 smoke_scale = 3.0
 particle_amount = 40
 
+[node name="Torso2" parent="WIPtestmech/Armature" parent_id_path=PackedInt32Array(1679724251, 359783737) index="1" unique_id=654991229]
+transform = Transform3D(0.99999976, 0, 0, 0, 0.998355, 0.05733398, 0, -0.057333983, 0.9983549, 0.28354645, -0.09670848, -0.78216624)
+
+[node name="ShoulderR" parent="WIPtestmech/Armature/Torso2/TorsoR" parent_id_path=PackedInt32Array(1679724251, 1891064601) index="0" unique_id=696837719]
+transform = Transform3D(0.30074325, -0.95358944, 0.014828171, 0.950771, 0.30100042, 0.07370676, -0.074749306, -0.008068616, 0.9971695, 0, 0.45996046, 0)
+
 [node name="RightArm" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm" parent_id_path=PackedInt32Array(1679724251, 914604739) index="0" unique_id=1710989070]
 transform = Transform3D(-0.35741854, 0.6914562, -0.62780714, -0.6968309, 0.25013238, 0.67220604, 0.6218356, 0.67773414, 0.39242592, -0.015673876, -0.059205055, 0.003597021)
 
@@ -173,8 +181,23 @@ fov = 68.0
 near = 1.0
 far = 2000.0
 
-[node name="RightShoulder" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR" parent_id_path=PackedInt32Array(1679724251, 696837719) index="1" unique_id=931325009]
-transform = Transform3D(-0.7894082, 0.26899937, -0.5517924, -0.26239997, -0.9604829, -0.09284058, -0.5549611, 0.07150111, 0.82879835, 0.035264492, 0.031585455, 0.03621483)
+[node name="RightShoulder" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR" index="1" unique_id=931325009]
+transform = Transform3D(-0.789408, 0.26899946, -0.55179244, -0.2624001, -0.9604828, -0.092840604, -0.5549611, 0.071501225, 0.8287983, 0.035264492, 0.031585455, 0.03621483)
+
+[node name="ShoulderL" parent="WIPtestmech/Armature/Torso2/TorsoL" parent_id_path=PackedInt32Array(1679724251, 2095289501) index="0" unique_id=682212612]
+transform = Transform3D(0.41181862, 0.895979, 0.16621366, -0.87424207, 0.33699587, 0.34947762, 0.25711128, -0.28923234, 0.92208385, -1.1920929e-07, 0.51991653, 4.7683716e-07)
+
+[node name="LegL" parent="WIPtestmech/Armature/TorsoLowerL/Torso_002" parent_id_path=PackedInt32Array(1679724251, 329142795) index="0" unique_id=616084653]
+transform = Transform3D(0.05258519, 0.108316615, 0.9927272, 0.054754585, -0.99291766, 0.10543757, 0.99712676, 0.04881119, -0.058142994, 0, 0.28172442, -4.7683716e-07)
+
+[node name="LegR" parent="WIPtestmech/Armature/TorsoLowerR" parent_id_path=PackedInt32Array(1679724251, 583431586) index="0" unique_id=1696298831]
+transform = Transform3D(0.996036, -0.08893478, -0.0016863616, 0.0048570717, 0.035447735, 0.99935967, -0.088818066, -0.99540645, 0.03573918, 4.7683716e-07, 0.25640345, -5.9604645e-08)
+
+[node name="FootR" parent="WIPtestmech/Armature/TorsoLowerR/LegR" index="0" unique_id=776964756]
+transform = Transform3D(0.91616416, -0.3997972, -0.028380089, 0.39979723, 0.90655696, 0.13533881, -0.02837991, -0.13533884, 0.9903928, 2.3841858e-07, 0.2732985, 0)
+
+[node name="RightFoot" parent="WIPtestmech/Armature/TorsoLowerR/LegR/FootR" index="0" unique_id=1107744312]
+transform = Transform3D(0.15202108, -0.4955742, -0.8551586, -0.027088383, -0.8669786, 0.49760884, -0.9880061, -0.052482143, -0.14522335, 0.0025524963, -0.0475505, 0.04030769)
 
 [node name="Collision" type="StaticBody3D" parent="WIPtestmech" unique_id=1915282858]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
@@ -302,14 +325,30 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("18_pause_menu")
 
-[node name="zezlan" parent="." unique_id=523842585 instance=ExtResource("13_trceg")]
-transform = Transform3D(-5, 0, -4.371139e-07, 0, 5, 0, 4.371139e-07, 0, -5, 24.829872, -1.95, 150.16513)
-script = ExtResource("1_script")
+[node name="zezlan" parent="." unique_id=1717272107 instance=ExtResource("13_trceg")]
+transform = Transform3D(-5, 0, -4.371139e-07, 0, 5, 0, 4.371139e-07, 0, -5, 34.724888, -2.2839618, 154.95802)
+script = ExtResource("20_zezlan_movement")
+local_travel_direction = Vector3(0, 0, 1)
+max_travel_speed = 8.0
 
-[node name="HitBox" type="StaticBody3D" parent="zezlan" unique_id=2142107595 groups=["enemy"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+[node name="TorsoL" parent="zezlan/Armature" parent_id_path=PackedInt32Array(1717272107, 527061528) index="1" unique_id=1867708599]
+transform = Transform3D(0.01070883, 0.999874, 0.011718034, -1.48179315e-05, -0.011718547, 0.9999313, 0.99994266, -0.010708269, -0.00011067588, 0, -0.040443838, -0.12277981)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="zezlan/HitBox" unique_id=1045665112]
-shape = SubResource("BoxShape3D_leg")
+[node name="LegL2" parent="zezlan/Armature/TorsoL" index="0" unique_id=1771406409]
+transform = Transform3D(0.98232806, 0.13712145, 0.12739322, -0.136145, 0.056423534, 0.9890808, 0.12843622, -0.9889459, 0.074094824, 1.2280907e-08, 0.29243013, -1.00337274e-07)
+
+[node name="LegR2" parent="zezlan/Armature/TorsoR" parent_id_path=PackedInt32Array(1717272107, 1998529173) index="0" unique_id=1716839918]
+transform = Transform3D(0.9799779, -0.14324059, -0.13829446, 0.1481894, 0.06083313, 0.98708624, -0.13297793, -0.98781645, 0.08084186, 5.9371814e-09, 0.29396123, -3.562309e-08)
+
+[node name="ZezlanTestCameraRig" type="Node3D" parent="zezlan" unique_id=3000004]
+transform = Transform3D(1, 0, 0, 0, 0.9396926, -0.34202015, 0, 0.34202015, 0.9396926, 0, 2.5, 0)
+script = ExtResource("19_zezlan_camera")
+
+[node name="Camera3D" type="Camera3D" parent="zezlan/ZezlanTestCameraRig" unique_id=3000005]
+transform = Transform3D(1, 0, 0, 0, 0.92407984, 0.38219967, 0, -0.38219967, 0.92407984, 0, -0.7894249, 2.7645874)
+keep_aspect = 0
+v_offset = -8.205
+far = 2000.0
 
 [editable path="WIPtestmech"]
+[editable path="zezlan"]
