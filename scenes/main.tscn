@@ -13,17 +13,29 @@
 [ext_resource type="Script" uid="uid://dgjcwck85kac5" path="res://scripts/directional_smoke.gd" id="15_directional_smoke"]
 [ext_resource type="Script" uid="uid://b3gcats3yakje" path="res://scripts/analog_reticle_hud.gd" id="16_analog_reticle"]
 [ext_resource type="Script" uid="uid://btwbp00nt72jd" path="res://scripts/combat_bark_ui.gd" id="17_bark_ui"]
+[ext_resource type="Script" uid="uid://dcd5tt8mgtcoe" path="res://scripts/pause_menu.gd" id="18_pause_menu"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_ref"]
 radius = 0.1
 height = 0.2
 
-[sub_resource type="Gradient" id="Gradient_trceg"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_aim_target"]
+albedo_color = Color(1, 0.85, 0.05, 1)
+emission_enabled = true
+emission = Color(1, 0.65, 0.05, 1)
+emission_energy_multiplier = 2.0
+
+[sub_resource type="SphereMesh" id="SphereMesh_aim_target"]
+material = SubResource("StandardMaterial3D_aim_target")
+radius = 0.65
+height = 1.3
+
+[sub_resource type="Gradient" id="Gradient_a8y0u"]
 offsets = PackedFloat32Array(0, 0.1, 0.5, 1, 1)
 colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.114, 1, 1, 1, 0.0798, 1, 1, 1, 1, 1, 1, 1, 0)
 
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_a8y0u"]
-gradient = SubResource("Gradient_trceg")
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_jkv2x"]
+gradient = SubResource("Gradient_a8y0u")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_a8y0u"]
 direction = Vector3(-1, 10, 0)
@@ -35,9 +47,9 @@ damping_min = 4.0
 damping_max = 6.0
 scale_min = 1.5
 scale_max = 3.0
-color_ramp = SubResource("GradientTexture1D_a8y0u")
+color_ramp = SubResource("GradientTexture1D_jkv2x")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_jkv2x"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_jbj1t"]
 transparency = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true
@@ -48,7 +60,7 @@ particles_anim_v_frames = 1
 particles_anim_loop = false
 
 [sub_resource type="QuadMesh" id="QuadMesh_smoke"]
-material = SubResource("StandardMaterial3D_jkv2x")
+material = SubResource("StandardMaterial3D_jbj1t")
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_leg"]
 size = Vector3(0.25, 0.8, 0.25)
@@ -103,6 +115,13 @@ gizmo_extents = 0.5
 
 [node name="Dot" type="MeshInstance3D" parent="REF_Charlie" unique_id=1921384776]
 mesh = SubResource("SphereMesh_ref")
+
+[node name="AimCameraTarget" type="Marker3D" parent="." unique_id=3000001]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.836662, 3.2, 119.67257)
+gizmo_extents = 2.0
+
+[node name="VisibleDragDot" type="MeshInstance3D" parent="AimCameraTarget" unique_id=3000002]
+mesh = SubResource("SphereMesh_aim_target")
 
 [node name="WorldSetup" type="Node" parent="." unique_id=812988922]
 script = ExtResource("7_world_setup")
@@ -244,12 +263,26 @@ layout_mode = 3
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -270.0
+offset_left = -430.0
 offset_top = 20.0
 offset_right = -20.0
-offset_bottom = 600.0
+offset_bottom = 700.0
 grow_horizontal = 0
 script = ExtResource("12_cinematic_ui")
+stage_1_stroke_speed = 2.0
+stage_2_stroke_speed = 2.0
+stage_3_stroke_speed = 2.0
+stage_4_stroke_speed = 1.5
+aim_build_speed = 0.06
+camera_stage_1_time = 4.0
+camera_stage_2_time = 4.0
+camera_stage_3_time = 7.0
+camera_stage_4_time = 8.0
+stage_1_fov = 70.0
+stage_2_fov = 60.0
+stage_3_fov = 50.0
+stage_4_fov = 40.0
+stage_5_fov = 30.0
 
 [node name="VBox" type="VBoxContainer" parent="WIPtestmech/CanvasLayer/DirectorUI" unique_id=966806640]
 layout_mode = 1
@@ -258,6 +291,16 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="PauseMenu" type="Control" parent="WIPtestmech/CanvasLayer" unique_id=3000003]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("18_pause_menu")
 
 [node name="zezlan" parent="." unique_id=523842585 instance=ExtResource("13_trceg")]
 transform = Transform3D(-5, 0, -4.371139e-07, 0, 5, 0, 4.371139e-07, 0, -5, 24.829872, -1.95, 150.16513)
