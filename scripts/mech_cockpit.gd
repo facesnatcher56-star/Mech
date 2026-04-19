@@ -82,18 +82,6 @@ var hit_sound: AudioStreamPlayer3D = null
 ## Speed applied to player-fired shells, in world units per second.
 @export var projectile_speed: float = 150.0
 
-@export_group("Incoming Shell Camera")
-## Group name for the left player-side camera marker (watches enemy shell approaching).
-@export var incoming_side_cam_left_group: String = "player_side_cam_left"
-## Group name for the right player-side camera marker.
-@export var incoming_side_cam_right_group: String = "player_side_cam_right"
-## FOV used while tracking the incoming shell.
-@export var incoming_fov: float = 65.0
-## Engine time scale while the incoming shell is in flight.
-@export var incoming_time_scale: float = 0.55
-## How long to hold on the player after impact before returning to cockpit (real seconds).
-@export var incoming_linger_duration: float = 1.2
-
 @export_group("Impact Side Camera")
 ## Group name on a Marker3D node in the scene for the left/Charlie-side camera spawn.
 @export var impact_side_cam_left_group: String = "side_cam_left"
@@ -203,9 +191,6 @@ var shot_will_hit_enemy: bool = false
 var shot_collision_debug_reported: bool = false
 var impact_side_camera_anchor: Node3D = null
 var impact_side_camera_active: bool = false
-var incoming_shell: Node3D = null
-var incoming_cinematic_phase: int = 0  # 0=off 1=tracking 2=linger
-var incoming_cinematic_timer: float = 0.0
 var aim_settle: float = 0.09
 var hit_chance: float = 0.0
 var fire_recovery: float = 0.0
@@ -230,6 +215,7 @@ var aim_camera_chunk_stage: int = 0
 var analog_heartbeat_player: AudioStreamPlayer
 var target_dossier_ui: Control = null
 var self_dossier_ui: Control = null
+var enemy_status_ui: Control = null
 var structure_hp: int = 0
 var torso_hp: int = 0
 var left_arm_hp: int = 0
@@ -380,6 +366,7 @@ func _ready():
 	get_tree().root.call_deferred("add_child", cinematic_camera)
 	call_deferred("_setup_target_dossier_ui")
 	call_deferred("_setup_self_dossier_ui")
+	call_deferred("_setup_enemy_status_ui")
 	if camera_debug_hud_enabled:
 		call_deferred("_setup_debug_hud")
 
@@ -425,6 +412,17 @@ func _setup_self_dossier_ui() -> void:
 	self_dossier_ui.scale = Vector2(0.65, 0.65)
 	canvas_layer.add_child(self_dossier_ui)
 	self_dossier_ui.show_dossier(get_hp_snapshot())
+
+func _setup_enemy_status_ui() -> void:
+	var canvas_layer = get_node_or_null("CanvasLayer")
+	if not canvas_layer:
+		return
+	enemy_status_ui = TARGET_DOSSIER_UI.new()
+	enemy_status_ui.name = "EnemyStatusUI"
+	enemy_status_ui.anchor_corner = TARGET_DOSSIER_UI.AnchorCorner.TOP_RIGHT
+	enemy_status_ui.scale = Vector2(0.65, 0.65)
+	canvas_layer.add_child(enemy_status_ui)
+	enemy_status_ui.visible = false
 
 func _reset_player_hp() -> void:
 	structure_hp = max_structure_hp
@@ -570,15 +568,27 @@ func _process(delta):
 		if reload_timer >= reload_duration:
 			is_reloading = false
 	else:
+		reload_progress = 1.0
 		current_spread = lerpf(current_spread, 0.0, delta * 0.5)
+
+	# Push player reload into self dossier every frame
+	if self_dossier_ui:
+		var snap := get_hp_snapshot()
+		snap["reload"] = {"progress": reload_progress, "label": "CANNON"}
+		self_dossier_ui.set_snapshot(snap)
+
+	# Push enemy HP + reload into enemy status dossier every frame
+	if enemy_status_ui and enemy_status_ui.visible:
+		var enemy_snap := _get_current_target_hp_snapshot()
+		if not enemy_snap.is_empty():
+			enemy_status_ui.show_dossier(enemy_snap)
+		else:
+			enemy_status_ui.visible = false
 
 	if cinematic_phase > 0:
 		_update_cinematic(delta)
 
-	if incoming_cinematic_phase > 0:
-		_update_incoming_cinematic(delta)
-
-	if combat_view_state == CombatViewState.NORMAL_VIEW and not is_transitioning and incoming_cinematic_phase == 0:
+	if combat_view_state == CombatViewState.NORMAL_VIEW and not is_transitioning:
 		_update_main_camera_orbit(delta)
 
 	# --- Real-time Ranging ---
@@ -757,7 +767,10 @@ func _set_analog_hud_visible(is_visible: bool) -> void:
 	if analog_reticle_hud:
 		analog_reticle_hud.visible = is_visible
 	if self_dossier_ui:
-		self_dossier_ui.visible = (combat_view_state == CombatViewState.NORMAL_VIEW)
+		var _in_normal := (combat_view_state == CombatViewState.NORMAL_VIEW)
+		self_dossier_ui.visible = _in_normal
+	if enemy_status_ui:
+		enemy_status_ui.visible = (combat_view_state == CombatViewState.NORMAL_VIEW)
 
 func _intersect_target_ray(source_camera: Camera3D, max_distance: float) -> Dictionary:
 	var space_state = get_world_3d().direct_space_state
@@ -1501,11 +1514,6 @@ func hit():
 	if cinematic_phase > 0:
 		_end_cinematic()
 
-	# Advance incoming cinematic from tracking → linger
-	if incoming_cinematic_phase == 1:
-		incoming_cinematic_phase = 2
-		incoming_cinematic_timer = 0.0
-
 	if camera:
 		for i in range(10):
 			var shake_tween = create_tween()
@@ -1688,78 +1696,6 @@ func _end_cinematic() -> void:
 	if combat_bark_ui:
 		combat_bark_ui.hide_bark()
 	_log_camera_switch("COCKPIT_RETURN")
-
-func begin_incoming_cinematic(shell: Node3D) -> void:
-	if is_dead or cinematic_phase > 0 or incoming_cinematic_phase > 0:
-		return
-	if combat_view_state != CombatViewState.NORMAL_VIEW:
-		return
-	if not is_instance_valid(cinematic_camera):
-		return
-
-	incoming_shell = shell
-	incoming_cinematic_phase = 1
-	incoming_cinematic_timer = 0.0
-
-	var cam_pos := _get_incoming_side_cam_position(shell)
-	cinematic_camera.global_position = cam_pos
-	cinematic_camera.fov = incoming_fov
-	if is_instance_valid(shell):
-		cinematic_camera.look_at(shell.global_position + Vector3.UP * 0.5, Vector3.UP)
-	if camera:
-		camera.current = false
-	cinematic_camera.current = true
-	Engine.time_scale = incoming_time_scale
-
-func _update_incoming_cinematic(delta: float) -> void:
-	var player_look_target := global_position + Vector3.UP * 3.5
-
-	if incoming_cinematic_phase == 1:
-		var cam_pos := _get_incoming_side_cam_position(incoming_shell)
-		cinematic_camera.global_position = cam_pos
-		if is_instance_valid(incoming_shell):
-			cinematic_camera.look_at(incoming_shell.global_position + Vector3.UP * 0.5, Vector3.UP)
-		else:
-			# Shell is gone without triggering hit() — go to linger
-			incoming_cinematic_phase = 2
-			incoming_cinematic_timer = 0.0
-
-	elif incoming_cinematic_phase == 2:
-		incoming_cinematic_timer += delta / maxf(0.001, Engine.time_scale)
-		cinematic_camera.look_at(player_look_target, Vector3.UP)
-		if incoming_cinematic_timer >= incoming_linger_duration:
-			_end_incoming_cinematic()
-
-func _end_incoming_cinematic() -> void:
-	incoming_cinematic_phase = 0
-	incoming_shell = null
-	incoming_cinematic_timer = 0.0
-	Engine.time_scale = 1.0
-	cinematic_camera.current = false
-	if camera:
-		camera.current = true
-
-func _get_incoming_side_cam_position(shell: Node3D) -> Vector3:
-	var left_marker  := _find_marker_in_group(incoming_side_cam_left_group)
-	var right_marker := _find_marker_in_group(incoming_side_cam_right_group)
-
-	if not left_marker and not right_marker:
-		return global_position + global_transform.basis.x * 18.0 + Vector3.UP * 5.0
-
-	if not right_marker:
-		return left_marker.global_position
-	if not left_marker:
-		return right_marker.global_position
-
-	if is_instance_valid(shell):
-		# Shell coming from the right → use left cam (and vice versa) for a cross-shot angle
-		var to_shell := shell.global_position - global_position
-		if to_shell.dot(global_transform.basis.x) >= 0.0:
-			return left_marker.global_position
-		else:
-			return right_marker.global_position
-
-	return left_marker.global_position
 
 func _update_cinematic(delta: float):
 	cinematic_timer += delta

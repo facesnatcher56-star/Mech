@@ -42,8 +42,12 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_update_layout)
 
 func _update_layout() -> void:
-	var vp := get_viewport_rect().size
-	set_position(Vector2(22.0, vp.y - size.y - 22.0))
+	# Scale down and anchor below the player dossier (210x306 panel at scale 0.65, margin 22)
+	var crew_scale := 0.65
+	scale = Vector2(crew_scale, crew_scale)
+	pivot_offset = Vector2.ZERO
+	var dossier_bottom := 22.0 + 306.0 * crew_scale
+	set_position(Vector2(22.0, dossier_bottom + 4.0))
 
 func _process(delta: float) -> void:
 	_display_reload_ratio = lerpf(_display_reload_ratio, _reload_ratio, min(1.0, delta * 9.0))

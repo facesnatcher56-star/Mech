@@ -1,6 +1,8 @@
 extends Node3D
 
-const RPG_PROJECTILE = preload("res://scenes/rpg_projectile.tscn")
+const RPG_PROJECTILE  = preload("res://scenes/rpg_projectile.tscn")
+const SND_LAUNCH      = preload("res://assets/Sounds/rocket-launch.wav")
+const SND_HIT         = preload("res://assets/Sounds/rocket-launchhit.wav")
 
 @export_group("Crew Order")
 ## Crew display name used on the top-left nameplate.
@@ -72,6 +74,8 @@ var patrol_timer: float = 0.0
 var patrol_height: float = 0.0
 var crew_order_ui: Control = null
 var _anim_player: AnimationPlayer = null
+var _snd_launch: AudioStreamPlayer3D = null
+var _snd_hit: AudioStreamPlayer3D = null
 
 func _ready() -> void:
 	rng.randomize()
@@ -82,6 +86,8 @@ func _ready() -> void:
 	_find_crew_order_ui()
 	_sync_crew_order_ui(true)
 	_anim_player = find_child("AnimationPlayer", true, false) as AnimationPlayer
+	_snd_launch = _make_audio_player("RPGLaunchSound", SND_LAUNCH)
+	_snd_hit    = _make_audio_player("RPGHitSound",    SND_HIT)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -188,6 +194,14 @@ func _try_order_rpg() -> void:
 	_show_crew_line("Copy. Rocket out.")
 	_fire_rpg(target)
 
+func _make_audio_player(node_name: String, stream: AudioStream) -> AudioStreamPlayer3D:
+	var p := AudioStreamPlayer3D.new()
+	p.name = node_name
+	p.stream = stream
+	p.unit_size = 60.0
+	add_child(p)
+	return p
+
 func _fire_rpg(target: Node3D) -> void:
 	var muzzle := get_node_or_null("RPGTube/Muzzle") as Node3D
 	if not muzzle:
@@ -213,6 +227,10 @@ func _fire_rpg(target: Node3D) -> void:
 	shell.global_position = muzzle.global_position
 	shell.look_at(target_point, Vector3.UP)
 
+	if _snd_launch:
+		_snd_launch.global_position = muzzle.global_position
+		_snd_launch.play()
+
 	var travel_time = muzzle.global_position.distance_to(target_point) / max(1.0, rpg_projectile_speed)
 	var shell_id := shell.get_instance_id()
 	get_tree().create_timer(travel_time + 0.6).timeout.connect(_on_rpg_travel_timeout.bind(rocket_state, shell_id, target_id, target_point, will_hit))
@@ -232,6 +250,7 @@ func _on_rpg_travel_timeout(rocket_state: Dictionary, shell_id: int, target_id: 
 	if not target:
 		return
 	if will_hit:
+		_rpg_play_hit_sound(target_point)
 		_apply_rpg_damage(target, target_point)
 	else:
 		_show_crew_line("Missed. Reloading.")
@@ -243,11 +262,19 @@ func _on_rpg_shell_hit(body, hit_pos: Vector3, rocket_state: Dictionary, target_
 	rocket_state["resolved"] = true
 	var hit_target := instance_from_id(target_id) as Node3D
 	if will_hit and hit_target and _is_body_on_target(body, hit_target):
+		_rpg_play_hit_sound(hit_pos)
 		_apply_rpg_damage(hit_target, hit_pos)
 	else:
 		_show_crew_line("Missed. Reloading.")
 		if hit_target:
 			_update_visible_dossier("RPG MISS", hit_target)
+
+func _rpg_play_hit_sound(hit_pos: Vector3) -> void:
+	if _snd_launch and _snd_launch.playing:
+		_snd_launch.stop()
+	if _snd_hit:
+		_snd_hit.global_position = hit_pos
+		_snd_hit.play()
 
 func _apply_rpg_damage(target: Node3D, hit_pos: Vector3) -> void:
 	var damage_model := _find_rpg_damage_model(target)

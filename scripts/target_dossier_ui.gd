@@ -1,9 +1,9 @@
 extends Control
 
-enum AnchorCorner { BOTTOM_RIGHT, TOP_LEFT }
+enum AnchorCorner { BOTTOM_RIGHT, TOP_LEFT, TOP_RIGHT }
 
 @export var anchor_corner: AnchorCorner = AnchorCorner.BOTTOM_RIGHT
-@export var panel_size: Vector2 = Vector2(210.0, 282.0)
+@export var panel_size: Vector2 = Vector2(210.0, 306.0)
 @export var panel_margin: Vector2 = Vector2(22.0, 22.0)
 @export var background_color: Color = Color(0.015, 0.018, 0.014, 0.92)
 @export var border_color: Color = Color(0.50, 0.47, 0.30, 0.95)
@@ -63,6 +63,8 @@ func _update_layout() -> void:
 	size = panel_size
 	if anchor_corner == AnchorCorner.TOP_LEFT:
 		position = panel_margin
+	elif anchor_corner == AnchorCorner.TOP_RIGHT:
+		position = Vector2(viewport_size.x - panel_size.x - panel_margin.x, panel_margin.y)
 	else:
 		position = Vector2(viewport_size.x - panel_size.x - panel_margin.x, viewport_size.y - panel_size.y - panel_margin.y)
 
@@ -117,6 +119,21 @@ func _draw() -> void:
 	# Legs
 	_draw_sil_part(font, Rect2(71,  160, 32, 82), leg_l_d, "L LEG")
 	_draw_sil_part(font, Rect2(107, 160, 32, 82), leg_r_d, "R LEG")
+
+	# Reload bar (shown when snapshot includes "reload" data)
+	if snapshot.has("reload") and snapshot["reload"] is Dictionary:
+		var rl      := snapshot["reload"] as Dictionary
+		var rl_prog := clampf(float(rl.get("progress", 1.0)), 0.0, 1.0)
+		var rl_lbl  := str(rl.get("label", "WEAPON"))
+		var rl_col  := good_color if rl_prog >= 0.95 else (warn_color if rl_prog >= 0.42 else critical_color)
+		var rl_stat := "READY" if rl_prog >= 0.95 else ("LOADING" if rl_prog < 0.42 else "ALMOST READY")
+		draw_line(Vector2(12, panel_size.y - 56), Vector2(panel_size.x - 12, panel_size.y - 56), border_color.darkened(0.5), 1.0)
+		draw_string(font, Vector2(14, panel_size.y - 46), rl_lbl,  HORIZONTAL_ALIGNMENT_LEFT,  -1,  9, muted_text_color)
+		draw_string(font, Vector2(panel_size.x - 14, panel_size.y - 46), rl_stat, HORIZONTAL_ALIGNMENT_RIGHT, 120, 9, rl_col)
+		var bar_r := Rect2(14, panel_size.y - 39, panel_size.x - 28, 8)
+		draw_rect(bar_r, Color(0.02, 0.025, 0.02, 1.0), true)
+		draw_rect(Rect2(bar_r.position, Vector2(bar_r.size.x * rl_prog, bar_r.size.y)), rl_col, true)
+		draw_rect(bar_r, border_color.darkened(0.4), false, 1.0)
 
 	# Impact line
 	draw_rect(Rect2(12, panel_size.y - 32, panel_size.x - 24, 22), Color(0, 0, 0, 0.5), true)

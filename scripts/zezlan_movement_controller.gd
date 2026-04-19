@@ -172,6 +172,11 @@ func apply_shell_damage(hit_body: Node, hit_pos: Vector3) -> Dictionary:
 		"snapshot": snapshot
 	}
 
+func get_fire_progress() -> float:
+	if is_destroyed:
+		return 0.0
+	return clampf(1.0 - (_fire_timer / maxf(0.001, fire_interval)), 0.0, 1.0)
+
 func get_hp_snapshot() -> Dictionary:
 	return {
 		"name": "ZEZLAN",
@@ -181,6 +186,7 @@ func get_hp_snapshot() -> Dictionary:
 			"left_leg": {"label": "LEFT LEG", "current": left_leg_hp, "max": max_left_leg_hp, "broken": left_leg_hp <= 0},
 			"right_leg": {"label": "RIGHT LEG", "current": right_leg_hp, "max": max_right_leg_hp, "broken": right_leg_hp <= 0}
 		},
+		"reload": {"progress": get_fire_progress(), "label": "CANNON"},
 		"destroyed": is_destroyed
 	}
 
@@ -300,15 +306,11 @@ func _fire_at_player() -> void:
 	shell.global_position = muzzle_pos
 	shell.look_at(aim_pos, Vector3.UP)
 
-	if player.has_method("begin_incoming_cinematic"):
-		player.begin_incoming_cinematic(shell)
 
 func _get_muzzle_position() -> Vector3:
-	var scene := get_tree().current_scene
-	if scene:
-		var charlie := scene.get_node_or_null("REF_Charlie") as Node3D
-		if charlie:
-			return charlie.global_position
+	var muzzle := find_child("EnemyMuzzle", true, false) as Node3D
+	if muzzle:
+		return muzzle.global_position
 	return global_position + Vector3.UP * 6.5
 
 func _update_throttle_input(delta: float) -> void:
