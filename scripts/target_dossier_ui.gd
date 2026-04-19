@@ -1,5 +1,8 @@
 extends Control
 
+enum AnchorCorner { BOTTOM_RIGHT, TOP_LEFT }
+
+@export var anchor_corner: AnchorCorner = AnchorCorner.BOTTOM_RIGHT
 @export var panel_size: Vector2 = Vector2(210.0, 282.0)
 @export var panel_margin: Vector2 = Vector2(22.0, 22.0)
 @export var background_color: Color = Color(0.015, 0.018, 0.014, 0.92)
@@ -58,7 +61,10 @@ func show_impact_line(text: String, part_key: String = "", new_snapshot: Diction
 func _update_layout() -> void:
 	var viewport_size := get_viewport_rect().size
 	size = panel_size
-	position = Vector2(viewport_size.x - panel_size.x - panel_margin.x, viewport_size.y - panel_size.y - panel_margin.y)
+	if anchor_corner == AnchorCorner.TOP_LEFT:
+		position = panel_margin
+	else:
+		position = Vector2(viewport_size.x - panel_size.x - panel_margin.x, viewport_size.y - panel_size.y - panel_margin.y)
 
 func _draw() -> void:
 	var font := get_theme_default_font()
@@ -91,19 +97,23 @@ func _draw() -> void:
 	var parts: Dictionary = {}
 	if snapshot.has("parts") and snapshot["parts"] is Dictionary:
 		parts = snapshot["parts"]
-	var torso_d  := _get_part(parts, "torso")
-	var leg_l_d  := _get_part(parts, "left_leg")
-	var leg_r_d  := _get_part(parts, "right_leg")
-	var neutral  := Color(0.14, 0.16, 0.11, 0.90)
+	var torso_d   := _get_part(parts, "torso")
+	var arm_l_d   := _get_part(parts, "left_arm")
+	var arm_r_d   := _get_part(parts, "right_arm")
+	var leg_l_d   := _get_part(parts, "left_leg")
+	var leg_r_d   := _get_part(parts, "right_leg")
+	var has_arms  := parts.has("left_arm") or parts.has("right_arm")
+	var neutral   := Color(0.14, 0.16, 0.11, 0.90)
 
 	# --- MECH SILHOUETTE ---
 	# Head
 	_draw_sil_part(font, Rect2(83, 64, 44, 20), {}, "HEAD", neutral)
 	# Torso
 	_draw_sil_part(font, Rect2(69, 88, 72, 68), torso_d, "TORSO")
-	# Arms (no data)
-	_draw_sil_part(font, Rect2(16,  94, 50, 56), {}, "ARM", neutral)
-	_draw_sil_part(font, Rect2(144, 94, 50, 56), {}, "ARM", neutral)
+	# Arms — only drawn when this mech has arm parts
+	if has_arms:
+		_draw_sil_part(font, Rect2(16,  94, 50, 56), arm_l_d, "L ARM")
+		_draw_sil_part(font, Rect2(144, 94, 50, 56), arm_r_d, "R ARM")
 	# Legs
 	_draw_sil_part(font, Rect2(71,  160, 32, 82), leg_l_d, "L LEG")
 	_draw_sil_part(font, Rect2(107, 160, 32, 82), leg_r_d, "R LEG")

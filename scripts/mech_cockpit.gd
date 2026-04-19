@@ -8,7 +8,6 @@ const TARGET_DOSSIER_UI = preload("res://scripts/target_dossier_ui.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
-var armor: int = 3
 var is_dead: bool = false
 var damage_flash_timer: float = 0.0
 
@@ -41,6 +40,22 @@ var hit_sound: AudioStreamPlayer3D = null
 ## Maximum optical zoom out. Keep this below fisheye territory; extra wide view comes from camera pullback.
 @export var max_fov_limit: float = 82.0
 @export var zoom_sensitivity: float = 5.0
+@export_group("Player HP")
+## Total player structure pool. Reaching zero kills the mech.
+@export var max_structure_hp: int = 60
+## Torso armor. Reaching zero also kills the mech.
+@export var max_torso_hp: int = 40
+## Left arm armor pool.
+@export var max_left_arm_hp: int = 25
+## Right arm armor pool.
+@export var max_right_arm_hp: int = 25
+## Left leg armor pool.
+@export var max_left_leg_hp: int = 20
+## Right leg armor pool.
+@export var max_right_leg_hp: int = 20
+## Damage taken per hit on any part.
+@export var hit_damage: int = 20
+
 @export_group("Main Camera Orbit")
 ## World-space offset from the mech origin that the normal-view camera orbits around.
 @export var main_camera_orbit_target_offset: Vector3 = Vector3(0.0, 1.35, 0.0)
@@ -199,6 +214,13 @@ var aim_camera_session_target: Vector3 = Vector3.ZERO
 var aim_camera_chunk_stage: int = 0
 var analog_heartbeat_player: AudioStreamPlayer
 var target_dossier_ui: Control = null
+var self_dossier_ui: Control = null
+var structure_hp: int = 0
+var torso_hp: int = 0
+var left_arm_hp: int = 0
+var right_arm_hp: int = 0
+var left_leg_hp: int = 0
+var right_leg_hp: int = 0
 var main_camera_orbit_yaw: float = 0.0
 var main_camera_orbit_pitch: float = 0.0
 
@@ -324,6 +346,7 @@ func _ready():
 	analog_sway_rng.randomize()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
+	_reset_player_hp()
 	camera = _find_main_camera()
 	if camera:
 		_detach_main_camera_from_mech()
@@ -341,6 +364,7 @@ func _ready():
 	_setup_analog_heartbeat_player()
 	get_tree().root.call_deferred("add_child", cinematic_camera)
 	call_deferred("_setup_target_dossier_ui")
+	call_deferred("_setup_self_dossier_ui")
 	if camera_debug_hud_enabled:
 		call_deferred("_setup_debug_hud")
 
@@ -375,6 +399,38 @@ func _setup_target_dossier_ui() -> void:
 	target_dossier_ui = TARGET_DOSSIER_UI.new()
 	target_dossier_ui.name = "TargetDossierUI"
 	canvas_layer.add_child(target_dossier_ui)
+
+func _setup_self_dossier_ui() -> void:
+	var canvas_layer = get_node_or_null("CanvasLayer")
+	if not canvas_layer:
+		return
+	self_dossier_ui = TARGET_DOSSIER_UI.new()
+	self_dossier_ui.name = "SelfDossierUI"
+	self_dossier_ui.anchor_corner = TARGET_DOSSIER_UI.AnchorCorner.TOP_LEFT
+	canvas_layer.add_child(self_dossier_ui)
+	self_dossier_ui.show_dossier(get_hp_snapshot())
+
+func _reset_player_hp() -> void:
+	structure_hp = max_structure_hp
+	torso_hp = max_torso_hp
+	left_arm_hp = max_left_arm_hp
+	right_arm_hp = max_right_arm_hp
+	left_leg_hp = max_left_leg_hp
+	right_leg_hp = max_right_leg_hp
+
+func get_hp_snapshot() -> Dictionary:
+	return {
+		"name": "PLAYER",
+		"structure": {"current": structure_hp, "max": max_structure_hp},
+		"parts": {
+			"torso":     {"label": "TORSO",   "current": torso_hp,     "max": max_torso_hp,     "broken": torso_hp <= 0},
+			"left_arm":  {"label": "L ARM",   "current": left_arm_hp,  "max": max_left_arm_hp,  "broken": left_arm_hp <= 0},
+			"right_arm": {"label": "R ARM",   "current": right_arm_hp, "max": max_right_arm_hp, "broken": right_arm_hp <= 0},
+			"left_leg":  {"label": "L LEG",   "current": left_leg_hp,  "max": max_left_leg_hp,  "broken": left_leg_hp <= 0},
+			"right_leg": {"label": "R LEG",   "current": right_leg_hp, "max": max_right_leg_hp, "broken": right_leg_hp <= 0},
+		},
+		"destroyed": is_dead
+	}
 
 func _show_target_dossier() -> void:
 	if not target_dossier_ui:
@@ -1411,24 +1467,29 @@ func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool):
 
 func hit():
 	if is_dead: return
-	armor -= 1
+	structure_hp = maxi(0, structure_hp - hit_damage)
+	torso_hp     = maxi(0, torso_hp - hit_damage)
 	damage_flash_timer = 2.0
 	is_reloading = true
 	reload_timer = 0.0
+
+	if self_dossier_ui:
+		self_dossier_ui.show_impact_line("HIT!", "torso", get_hp_snapshot())
 
 	# If we take a hit during the cinematic, violently abort back to cockpit
 	if cinematic_phase > 0:
 		_end_cinematic()
 
-	for i in range(10):
-		var shake_tween = create_tween()
-		shake_tween.tween_property(camera, "h_offset", randf_range(-0.5, 0.5), 0.03)
-		shake_tween.tween_property(camera, "v_offset", randf_range(-0.5, 0.5), 0.03)
-	var reset_tween = create_tween()
-	reset_tween.tween_property(camera, "h_offset", 0.0, 0.05).set_delay(0.3)
-	reset_tween.tween_property(camera, "v_offset", 0.0, 0.05).set_delay(0.3)
+	if camera:
+		for i in range(10):
+			var shake_tween = create_tween()
+			shake_tween.tween_property(camera, "h_offset", randf_range(-0.5, 0.5), 0.03)
+			shake_tween.tween_property(camera, "v_offset", randf_range(-0.5, 0.5), 0.03)
+		var reset_tween = create_tween()
+		reset_tween.tween_property(camera, "h_offset", 0.0, 0.05).set_delay(0.3)
+		reset_tween.tween_property(camera, "v_offset", 0.0, 0.05).set_delay(0.3)
 
-	if armor <= 0:
+	if structure_hp <= 0 or torso_hp <= 0:
 		is_dead = true
 		var death_tween = create_tween()
 		death_tween.tween_property(self, "rotation_degrees:z", 85.0, 2.0).set_trans(Tween.TRANS_SINE)
