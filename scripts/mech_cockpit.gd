@@ -756,7 +756,7 @@ func _intersect_target_ray(source_camera: Camera3D, max_distance: float) -> Dict
 		var result = space_state.intersect_ray(query)
 		if result.is_empty():
 			return {}
-		if _is_world_targeting_noise(result.collider):
+		if _is_world_targeting_noise(result.collider) or _is_player_tree_node(result.collider as Node):
 			if result.collider is CollisionObject3D:
 				excluded.append((result.collider as CollisionObject3D).get_rid())
 			ray_from = result.position + (direction * 0.08)
