@@ -1,5 +1,17 @@
 extends Node3D
 
+const PROJECTILE = preload("res://scenes/projectile.tscn")
+
+@export_group("Zezlan Firing")
+## Seconds between each shot fired at the player.
+@export var fire_interval: float = 6.0
+## Delay before the very first shot.
+@export var initial_fire_delay: float = 4.0
+## Shell travel speed in world units per second.
+@export var shell_speed: float = 80.0
+## Vertical offset applied to the player aim point (targets the cockpit, not the feet).
+@export var aim_height_offset: float = 3.0
+
 @export_group("Zezlan Movement - Input")
 ## Hold this key to raise the target throttle.
 @export var throttle_up_key: Key = KEY_W
@@ -78,6 +90,7 @@ extends Node3D
 ## Damage applied to total structure if an unmapped Zezlan mesh is hit.
 @export var fallback_hit_damage: int = 18
 
+var _fire_timer: float = 0.0
 var target_throttle: float = 0.0
 var current_travel_speed: float = 0.0
 var current_animation_speed: float = 0.0
@@ -96,6 +109,7 @@ signal hp_changed(snapshot: Dictionary)
 func _ready() -> void:
 	add_to_group(collision_group_name)
 	_reset_hp_pools()
+	_fire_timer = initial_fire_delay
 	if build_mesh_collision_on_ready:
 		_build_mesh_colliders()
 
@@ -260,6 +274,42 @@ func _process(delta: float) -> void:
 	_update_throttle_input(delta)
 	_update_travel(delta)
 	_update_animation(delta)
+	_update_fire_timer(delta)
+
+func _update_fire_timer(delta: float) -> void:
+	if is_destroyed:
+		return
+	_fire_timer -= delta
+	if _fire_timer <= 0.0:
+		_fire_timer = fire_interval
+		_fire_at_player()
+
+func _fire_at_player() -> void:
+	var player := get_tree().get_first_node_in_group("player") as Node3D
+	if not is_instance_valid(player):
+		return
+
+	var muzzle_pos := _get_muzzle_position()
+	var aim_pos    := player.global_position + Vector3.UP * aim_height_offset
+
+	var shell := PROJECTILE.instantiate()
+	shell.shooter = self
+	shell.speed = shell_speed
+	shell.is_player_shot = false
+	get_tree().root.add_child(shell)
+	shell.global_position = muzzle_pos
+	shell.look_at(aim_pos, Vector3.UP)
+
+	if player.has_method("begin_incoming_cinematic"):
+		player.begin_incoming_cinematic(shell)
+
+func _get_muzzle_position() -> Vector3:
+	var scene := get_tree().current_scene
+	if scene:
+		var charlie := scene.get_node_or_null("REF_Charlie") as Node3D
+		if charlie:
+			return charlie.global_position
+	return global_position + Vector3.UP * 6.5
 
 func _update_throttle_input(delta: float) -> void:
 	if Input.is_physical_key_pressed(throttle_up_key):
