@@ -44,45 +44,32 @@ var muzzle: Node3D
 @export var zoom_sensitivity: float = 5.0
 
 @export_group("Gun Cam")
-## How long to stay on the gun cam AFTER firing before switching to the impact cam.
-@export var guncam_duration: float = 0.1
+## FOV used during the gun-cam dolly-in transition.
 @export var guncam_fov: float = 75.0
+
+@export_group("Fire Cam")
+## How long to hold the fire cam after the shot before tracking the shell.
+@export var firecam_duration: float = 0.5
+## FOV of the fire cam. Overrides the FireCam_R marker's built-in FOV.
+@export var firecam_fov: float = 75.0
 
 @export_group("Projectile")
 ## Speed applied to player-fired shells, in world units per second.
 @export var projectile_speed: float = 150.0
 
-@export_group("Projectile Collision Debug")
-## Enables detailed shell collision tracing for player-fired shells.
-@export var projectile_collision_debug_enabled: bool = true
-## Physics mask used by the shell debug sweep ray. Default 1 matches the shell collider.
-@export_flags_3d_physics var projectile_collision_debug_mask: int = 1
-## Prints periodic shell path samples so you can see where the bullet traveled.
-@export var projectile_collision_debug_log_path: bool = true
-## Seconds between shell path samples when path logging is enabled.
-@export var projectile_collision_debug_path_interval: float = 0.05
-## If enabled, a swept ray hit resolves the shell immediately instead of only logging a likely tunnel-through.
-@export var projectile_collision_debug_resolve_sweep_hits: bool = false
-
-@export_group("Impact Cam")
-## Distance from the target to place the impact camera.
-@export var impact_cam_distance: float = 10.0
-@export var impactcam_timeout: float = 1.5
-@export var impactcam_fov: float = 75.0
-@export var impactcam_rotation_speed: float = 0.0 # 0 = No rotation
-@export var near_miss_sound_distance: float = 4.0
-
 @export_group("Impact Side Camera")
-## Enables the Zezlan-relative side tracking impact camera.
-@export var impact_side_camera_enabled: bool = true
-## Charlie-side camera offset in Zezlan local space, derived from REF_Charlie.
-@export var impact_side_camera_left_local_offset: Vector3 = Vector3(1.85, 0.72, -1.76)
-## Mirrored Alpha-side camera offset in Zezlan local space.
-@export var impact_side_camera_right_local_offset: Vector3 = Vector3(-1.85, 0.72, -1.76)
+## Group name on a Marker3D node in the scene for the left/Charlie-side camera spawn.
+@export var impact_side_cam_left_group: String = "side_cam_left"
+## Group name on a Marker3D node in the scene for the right/Alpha-side camera spawn.
+@export var impact_side_cam_right_group: String = "side_cam_right"
+## Fallback: Charlie-side camera offset in Zezlan local space (used when no marker assigned).
+@export var impact_side_camera_left_local_offset: Vector3 = Vector3(8.5, 0.5, 12.0)
+## Fallback: Alpha-side camera offset in Zezlan local space (used when no marker assigned).
+@export var impact_side_camera_right_local_offset: Vector3 = Vector3(-8.5, 0.5, 12.0)
 ## Projectile distance from the side camera zone that activates the side camera. Larger values switch to the tracking view earlier.
-@export var impact_side_camera_trigger_distance: float = 25.0
+@export var impact_side_camera_trigger_distance: float = 40.0
 ## Field of view used after the side camera activates.
-@export var impact_side_camera_fov: float = 75.0
+@export var impact_side_camera_fov: float = 60.0
 ## Engine time scale while the side camera tracks the projectile.
 @export var impact_side_camera_time_scale: float = 0.05
 ## Vertical offset added to the projectile look-at target.
@@ -95,6 +82,7 @@ var muzzle: Node3D
 @export_group("Miss/Linger")
 @export var linger_duration: float = 1.0
 @export var miss_timeout: float = 2.0
+@export var near_miss_sound_distance: float = 4.0
 
 @export_group("Analog Aim")
 @export var aim_settle_speed: float = 0.045
@@ -157,6 +145,12 @@ var muzzle: Node3D
 @export var medium_max_hit_chance: float = 0.78
 @export var long_max_hit_chance: float = 0.70
 
+@export_group("Camera System Debug")
+## Enables logging of camera switches, positions, and view durations.
+@export var camera_debug_enabled: bool = true
+## Shows a live on-screen HUD with all camera state every frame.
+@export var camera_debug_hud_enabled: bool = true
+
 @export_group("Analog Aim Heartbeat")
 ## Heartbeat loop played from the analog aim camera while aiming.
 @export var analog_heartbeat_stream: AudioStream = DEFAULT_ANALOG_HEARTBEAT
@@ -167,8 +161,7 @@ var muzzle: Node3D
 
 var cinematic_camera: Camera3D
 var active_shell: Node3D = null
-var cinematic_phase: int = 0 # 0 = Off, 1 = Gun Cam, 2 = Impact Cam, 3 = Impact Linger, 4 = Fast Travel
-var impact_cam_pos: Vector3 = Vector3.ZERO
+var cinematic_phase: int = 0 # 0 = Off, 1 = Fire Cam, 2 = Side Track, 3 = Linger
 var target_hit_point: Vector3 = Vector3.ZERO
 var shot_muzzle_pos: Vector3
 var cinematic_timer: float = 0.0
@@ -202,6 +195,119 @@ var aim_camera_session_target: Vector3 = Vector3.ZERO
 var aim_camera_chunk_stage: int = 0
 var analog_heartbeat_player: AudioStreamPlayer
 
+# --- CAMERA DEBUG TRACKING ---
+var _debug_cam_last_switch_time: float = 0.0
+var _debug_cam_current_view_name: String = "COCKPIT_MAIN"
+var _debug_hud_label: Label = null
+
+func _setup_debug_hud() -> void:
+	_debug_hud_label = Label.new()
+	_debug_hud_label.position = Vector2(10, 10)
+	_debug_hud_label.add_theme_font_size_override("font_size", 13)
+	_debug_hud_label.add_theme_color_override("font_color", Color(0.0, 1.0, 0.4))
+	_debug_hud_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	_debug_hud_label.add_theme_constant_override("shadow_offset_x", 1)
+	_debug_hud_label.add_theme_constant_override("shadow_offset_y", 1)
+	get_tree().root.call_deferred("add_child", _debug_hud_label)
+
+func _phase_name(p: int) -> String:
+	match p:
+		0: return "0:OFF"
+		1: return "1:FIRE_CAM"
+		2: return "2:SHELL_TRACK"
+		3: return "3:LINGER"
+		_: return str(p) + ":UNKNOWN"
+
+func _view_state_name(v: int) -> String:
+	match v:
+		CombatViewState.NORMAL_VIEW:         return "NORMAL_VIEW"
+		CombatViewState.GUN_CAM_VIEW:        return "GUN_CAM_VIEW"
+		CombatViewState.ANALOG_AIM_VIEW:     return "ANALOG_AIM_VIEW"
+		CombatViewState.FIRING_FROM_FIRE_CAM: return "FIRING_FROM_FIRE_CAM"
+		_: return "UNKNOWN"
+
+func _update_debug_hud() -> void:
+	if not _debug_hud_label:
+		return
+	var cin_valid = cinematic_camera != null
+	var cin_pos   = cinematic_camera.global_position if cin_valid else Vector3.ZERO
+	var cin_rot   = cinematic_camera.rotation_degrees if cin_valid else Vector3.ZERO
+	var cin_cur   = cinematic_camera.current if cin_valid else false
+	var cin_fov   = cinematic_camera.fov if cin_valid else 0.0
+	var cock_pos  = camera.global_position if camera else Vector3.ZERO
+	var cock_rot  = camera.rotation_degrees if camera else Vector3.ZERO
+	var cock_cur  = camera.current if camera else false
+	var cock_fov  = camera.fov if camera else 0.0
+
+	var shell_pos_str := "null"
+	var shell_dist_str := "--"
+	if is_instance_valid(active_shell):
+		shell_pos_str = _fmt_debug_vec(active_shell.global_position)
+		shell_dist_str = "%.1fm" % active_shell.global_position.distance_to(target_hit_point)
+
+	var side_zone := Vector3.ZERO
+	var dist_to_zone := 0.0
+	if cinematic_phase >= 2 and is_instance_valid(active_shell):
+		side_zone = _get_impact_side_camera_world_position()
+		dist_to_zone = active_shell.global_position.distance_to(side_zone)
+	elif cinematic_phase >= 2:
+		side_zone = _get_impact_side_camera_world_position()
+
+	var threshold_str := "--"
+	match cinematic_phase:
+		1: threshold_str = "%.3f / %.3f" % [cinematic_timer, firecam_duration]
+		2: threshold_str = "tracking (side_active=%s)" % str(impact_side_camera_active)
+		3: threshold_str = "%.3f / %.3f" % [cinematic_timer, _get_impact_resolve_linger_time()]
+
+	var lines := PackedStringArray()
+	lines.append("╔══ CAMERA DEBUG ══════════════════════════════╗")
+	lines.append("  view_state   : %s" % _view_state_name(combat_view_state))
+	lines.append("  phase        : %s" % _phase_name(cinematic_phase))
+	lines.append("  timer/thresh : %s" % threshold_str)
+	lines.append("  time_scale   : %.3f" % Engine.time_scale)
+	lines.append("  is_reloading : %s  reload %.2f/%.2fs" % [str(is_reloading), reload_timer, reload_duration])
+	lines.append("  shot_resolved: %s  will_hit: %s" % [str(shot_resolved), str(shot_will_hit_enemy)])
+	lines.append("  side_cam_act : %s  is_transitioning: %s" % [str(impact_side_camera_active), str(is_transitioning)])
+	lines.append("──────────────────────────────────────────────")
+	lines.append("  [CIN]  cur=%-5s fov=%4.1f  pos=%s" % [str(cin_cur), cin_fov, _fmt_debug_vec(cin_pos)])
+	lines.append("         rot=%s" % _fmt_debug_vec(cin_rot))
+	lines.append("  [COCK] cur=%-5s fov=%4.1f  pos=%s" % [str(cock_cur), cock_fov, _fmt_debug_vec(cock_pos)])
+	lines.append("         rot=%s" % _fmt_debug_vec(cock_rot))
+	lines.append("──────────────────────────────────────────────")
+	lines.append("  shell pos    : %s" % shell_pos_str)
+	lines.append("  shell→target : %s" % shell_dist_str)
+	lines.append("  side_zone    : %s" % _fmt_debug_vec(side_zone))
+	if cinematic_phase == 2 and is_instance_valid(active_shell):
+		lines.append("  dist→zone    : %.1fm / trigger %.1fm" % [dist_to_zone, impact_side_camera_trigger_distance])
+	lines.append("  target_hit   : %s" % _fmt_debug_vec(target_hit_point))
+	lines.append("╚══════════════════════════════════════════════╝")
+	_debug_hud_label.text = "\n".join(lines)
+
+func _log_camera_switch(new_view_name: String) -> void:
+	if not camera_debug_enabled: return
+	var now = Time.get_ticks_msec() / 1000.0
+	var duration = now - _debug_cam_last_switch_time
+	var from_name = _debug_cam_current_view_name  # capture now, before update
+	_debug_cam_last_switch_time = now
+	_debug_cam_current_view_name = new_view_name
+	get_tree().process_frame.connect(func():
+		var cin_valid = cinematic_camera != null
+		var cin_pos   = cinematic_camera.global_position if cin_valid else Vector3.ZERO
+		var cin_cur   = cinematic_camera.current if cin_valid else false
+		var cock_cur  = camera.current if camera else false
+		var shell_str = _fmt_debug_vec(active_shell.global_position) if is_instance_valid(active_shell) else "none"
+		print(
+			"[CAM] %-32s" % (from_name + " →"),
+			" %-34s" % new_view_name,
+			" | phase=%s" % _phase_name(cinematic_phase),
+			" | ts=%.3f" % Engine.time_scale,
+			" | cin.cur=%s cock.cur=%s" % [str(cin_cur), str(cock_cur)],
+			" | cin.pos=%s" % _fmt_debug_vec(cin_pos),
+			" | shell=%s" % shell_str,
+			" | held=%.3fs" % duration
+		)
+	, CONNECT_ONE_SHOT)
+
 # --- RECOIL TRACKING ---
 var recoil_tween: Tween
 var visual_barrel_base_pos: Vector3
@@ -225,6 +331,8 @@ func _ready():
 	cinematic_camera.current = false
 	_setup_analog_heartbeat_player()
 	get_tree().root.call_deferred("add_child", cinematic_camera)
+	if camera_debug_hud_enabled:
+		call_deferred("_setup_debug_hud")
 
 func _setup_analog_heartbeat_player() -> void:
 	analog_heartbeat_player = AudioStreamPlayer.new()
@@ -272,7 +380,7 @@ func _setup_big_gun():
 			muzzle = Marker3D.new()
 			muzzle.name = "Muzzle"
 			# Position it at the end of the gun barrel on the RightArm model
-			muzzle.position = Vector3(-0.5, 0.2, 1.2)
+			muzzle.position = Vector3(-0.5, 0.45, 1.2)
 			visual_barrel.add_child(muzzle)
 
 func _input(event):
@@ -303,6 +411,9 @@ var last_ray_result: Dictionary = {}
 func _process(delta):
 	if is_dead: return
 
+	if camera_debug_hud_enabled:
+		_update_debug_hud()
+
 	# Butter-Smooth Blend
 	if camera and not is_transitioning:
 		var target_fov = main_fov
@@ -317,9 +428,14 @@ func _process(delta):
 	# --- Ground Alignment (Stationary) ---
 	var ss_ground = get_world_3d().direct_space_state
 	var ground_query = PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 2.0, global_position + Vector3.DOWN * 5.0)
+	# Fix: Exclude self and all children from the ground check to prevent snapping to own hitbox
+	ground_query.exclude = _get_sweep_exclusions()
+	
 	var ground_res = ss_ground.intersect_ray(ground_query)
 	if ground_res:
-		global_position.y = lerpf(global_position.y, ground_res.position.y + 0.05, delta * 5.0)
+		global_position.y = lerpf(global_position.y, ground_res.position.y + 3.625, delta * 5.0)
+	else:
+		global_position.y = lerpf(global_position.y, 3.625, delta * 5.0)
 
 	var reload_progress = 0.0
 
@@ -327,13 +443,13 @@ func _process(delta):
 		reload_timer += delta
 		current_spread = max_spread
 		reload_progress = 1.0 - (reload_timer / reload_duration)
-
-		# Hide reticle during cinematic
-		pass
-
-		_update_cinematic(delta)
+		if reload_timer >= reload_duration:
+			is_reloading = false
 	else:
 		current_spread = lerpf(current_spread, 0.0, delta * 0.5)
+
+	if cinematic_phase > 0:
+		_update_cinematic(delta)
 
 	# --- Real-time Ranging ---
 	var aim_camera = _get_aim_query_camera()
@@ -426,10 +542,7 @@ func _get_fire_camera_marker() -> Camera3D:
 	return _get_gun_camera_marker()
 
 func _get_fire_camera_fov() -> float:
-	var fire_camera = _get_fire_camera_marker()
-	if fire_camera:
-		return fire_camera.fov
-	return guncam_fov
+	return firecam_fov
 
 func _set_analog_hud_visible(is_visible: bool) -> void:
 	if analog_reticle_hud:
@@ -540,11 +653,13 @@ func _begin_aim_flow() -> void:
 	, 0.0, 1.0, transition_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	view_transition_tween.finished.connect(func():
 		is_transitioning = false
+		_log_camera_switch("GUN_CAM_TRANSITION_COMPLETE")
 		_enter_analog_aim_view()
 	)
 
 func _enter_analog_aim_view() -> void:
 	combat_view_state = CombatViewState.ANALOG_AIM_VIEW
+	_log_camera_switch("ANALOG_AIM_VIEW")
 	camera.current = false
 	cinematic_camera.current = true
 	_set_analog_hud_visible(true)
@@ -977,6 +1092,7 @@ func _return_to_fire_cam_then_fire(shot_lock: Dictionary) -> void:
 	, 0.0, 1.0, analog_to_fire_cam_return_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	view_transition_tween.finished.connect(func():
 		is_transitioning = false
+		_log_camera_switch("FIRING_CAM_READY")
 		_begin_fire_sequence_from_lock(shot_lock)
 	)
 
@@ -1019,8 +1135,6 @@ func _build_shot_lock(source_camera: Camera3D) -> Dictionary:
 
 ## Slomo scale while watching the gun cam/firing.
 @export var bullet_slomo: float = 0.2
-## Slomo scale for the close-up impact view.
-@export var impact_slomo: float = 0.05
 
 func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool):
 	combat_view_state = CombatViewState.FIRING_FROM_FIRE_CAM
@@ -1057,32 +1171,17 @@ func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool):
 	shot_collision_debug_reported = false
 	impact_side_camera_active = false
 
-	# Hold the dedicated firing camera through the visible muzzle/fire moment.
+	# Snapshot the dedicated firing camera at this exact moment so it remains STATIONARY during recoil
 	var fire_camera = _get_fire_camera_marker()
 	if fire_camera:
 		cinematic_camera.global_transform = fire_camera.global_transform
 		cinematic_camera.fov = fire_camera.fov
-
-	# --- CONSISTENT IMPACT CAM ---
-	var m_pos = muzzle.global_position
-	var t_pos = target_hit_point
-	var f_dir = (t_pos - m_pos).normalized()
-	var s_dir = f_dir.cross(Vector3.UP).normalized()
-	if s_dir.length() < 0.1: s_dir = Vector3.RIGHT
-
-	# Pre-calculate the teleport spot: 2m back, 1m up, 1.5m side
-	impact_cam_pos = t_pos - (f_dir * impact_cam_distance) + (s_dir * 1.5) + Vector3(0, 1.0, 0)
 
 	var shell = PROJECTILE.instantiate()
 	shell.shooter = self
 	shell.is_player_shot = true
 	shell.is_destined_for_hit = will_hit_enemy
 	shell.speed = projectile_speed
-	shell.collision_debug_enabled = projectile_collision_debug_enabled
-	shell.collision_debug_mask = projectile_collision_debug_mask
-	shell.collision_debug_log_path = projectile_collision_debug_log_path
-	shell.collision_debug_path_interval = projectile_collision_debug_path_interval
-	shell.collision_debug_resolve_sweep_hits = projectile_collision_debug_resolve_sweep_hits
 
 	shell.has_hit.connect(func(body, hit_pos):
 		if shot_resolved:
@@ -1123,7 +1222,7 @@ func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool):
 	var recoil_vector = visual_barrel.transform.basis * (-muzzle.position.normalized() * 0.5)
 
 	recoil_tween.tween_property(visual_barrel, "position", visual_barrel_base_pos + recoil_vector, 0.05).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	recoil_tween.tween_property(visual_barrel, "position", visual_barrel_base_pos, 1.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	recoil_tween.tween_property(visual_barrel, "position", visual_barrel_base_pos, 0.18).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 
 
 func hit():
@@ -1133,13 +1232,9 @@ func hit():
 	is_reloading = true
 	reload_timer = 0.0
 
-	# If we take a hit during the cinematic, violently abort the cinematic and slam back to cockpit
-	cinematic_phase = 0
-	combat_view_state = CombatViewState.NORMAL_VIEW
-	_set_analog_hud_visible(false)
-	_stop_analog_heartbeat()
-	cinematic_camera.current = false
-	camera.current = true
+	# If we take a hit during the cinematic, violently abort back to cockpit
+	if cinematic_phase > 0:
+		_end_cinematic()
 
 	for i in range(10):
 		var shake_tween = create_tween()
@@ -1157,8 +1252,6 @@ func hit():
 
 ## How much to speed up time during the bullet's travel phase.
 @export var travel_fast_forward: float = 3.5
-## Distance from target to drop back into slomo for the impact cam.
-@export var impact_slomo_threshold: float = 15.0
 
 func _play_near_miss_sound(miss_position: Vector3):
 	if miss_sound and _distance_to_nearest_enemy(miss_position) <= near_miss_sound_distance:
@@ -1180,52 +1273,22 @@ func _update_impact_side_camera(_delta: float) -> void:
 
 	var bullet_pos = active_shell.global_position
 	var side_camera_zone = _get_impact_side_camera_world_position()
+	
+	# Fix: Always update camera pose so we see the shell from the side zone even during fast-travel
+	_update_impact_side_camera_pose(bullet_pos, side_camera_zone)
+
 	var dist_to_camera_zone = bullet_pos.distance_to(side_camera_zone)
 	if not impact_side_camera_active:
-		Engine.time_scale = travel_fast_forward
 		if dist_to_camera_zone <= impact_side_camera_trigger_distance:
 			impact_side_camera_active = true
-			_update_impact_side_camera_pose(bullet_pos, side_camera_zone)
+			Engine.time_scale = impact_side_camera_time_scale
+			_log_camera_switch("SIDE_CAM_ACTIVATED (dist=%.1fm)" % dist_to_camera_zone)
+		else:
+			Engine.time_scale = travel_fast_forward
 	else:
 		Engine.time_scale = impact_side_camera_time_scale
-		_update_impact_side_camera_pose(bullet_pos, side_camera_zone)
 
 	var passed_target = _has_shell_passed_target(bullet_pos)
-	if passed_target:
-		_debug_report_predicted_hit_without_collision(bullet_pos)
-	if passed_target and not shot_will_hit_enemy:
-		_resolve_missed_shot_at_target()
-
-	if shot_resolved or passed_target:
-		cinematic_phase = 3
-		cinematic_timer = 0.0
-		active_shell = null
-
-func _update_legacy_impact_camera(delta: float) -> void:
-	cinematic_camera.fov = impactcam_fov
-
-	var drift_speed = 0.5
-	cinematic_camera.global_position += Vector3.UP * (drift_speed * delta)
-	var right_dir = cinematic_camera.global_transform.basis.x
-	cinematic_camera.global_position += right_dir * (drift_speed * delta)
-
-	if not is_instance_valid(active_shell):
-		cinematic_phase = 3
-		cinematic_timer = 0.0
-		return
-
-	var bullet_pos = active_shell.global_position
-	cinematic_camera.look_at(bullet_pos, Vector3.UP)
-
-	var dist_to_target = bullet_pos.distance_to(target_hit_point)
-	if dist_to_target > impact_slomo_threshold:
-		Engine.time_scale = travel_fast_forward
-	else:
-		Engine.time_scale = impact_slomo
-
-	var passed_target = _has_shell_passed_target(bullet_pos)
-	if passed_target:
-		_debug_report_predicted_hit_without_collision(bullet_pos)
 	if passed_target and not shot_will_hit_enemy:
 		_resolve_missed_shot_at_target()
 
@@ -1243,16 +1306,49 @@ func _update_impact_side_camera_pose(bullet_pos: Vector3, side_camera_zone: Vect
 		cinematic_camera.global_position = cinematic_camera.global_position.lerp(side_camera_zone, blend)
 	cinematic_camera.look_at(bullet_pos + Vector3.UP * impact_side_camera_look_at_height_bias, Vector3.UP)
 
+func _find_marker_in_group(group: String) -> Node3D:
+	if group.is_empty():
+		return null
+	var nodes := get_tree().get_nodes_in_group(group)
+	for n in nodes:
+		if n is Node3D and is_instance_valid(n):
+			return n as Node3D
+	return null
+
 func _get_impact_side_camera_world_position() -> Vector3:
 	var anchor = _get_impact_side_camera_anchor()
-	if not anchor:
-		return impact_cam_pos
 
-	var hit_local = anchor.to_local(target_hit_point)
-	var side_offset = impact_side_camera_left_local_offset
-	if hit_local.x < 0.0:
-		side_offset = impact_side_camera_right_local_offset
-	return anchor.to_global(side_offset)
+	# Determine which side the hit landed on relative to the anchor's local X axis.
+	var use_left := true
+	if anchor:
+		use_left = anchor.to_local(target_hit_point).x >= 0.0
+
+	# --- Marker path: find nodes by group name ---
+	var left_marker  := _find_marker_in_group(impact_side_cam_left_group)
+	var right_marker := _find_marker_in_group(impact_side_cam_right_group)
+	if use_left and left_marker:
+		return left_marker.global_position
+	if not use_left and right_marker:
+		return right_marker.global_position
+	if left_marker:
+		return left_marker.global_position
+	if right_marker:
+		return right_marker.global_position
+
+	# --- Offset path: no markers assigned, compute from anchor + offset ---
+	if not anchor:
+		var side_dir = (target_hit_point - shot_muzzle_pos).cross(Vector3.UP).normalized()
+		return target_hit_point + side_dir * impact_side_camera_left_local_offset.x + Vector3.UP * 2.0
+
+	var side_offset = impact_side_camera_left_local_offset if use_left else impact_side_camera_right_local_offset
+	var unscaled_basis = anchor.global_transform.basis.orthonormalized()
+	var world_pos = anchor.global_position + unscaled_basis * side_offset
+
+	if world_pos.z > target_hit_point.z + 1.0:
+		var mirrored_offset = Vector3(side_offset.x, side_offset.y, -abs(side_offset.z))
+		world_pos = anchor.global_position + unscaled_basis * mirrored_offset
+
+	return world_pos
 
 func _get_impact_side_camera_anchor() -> Node3D:
 	if impact_side_camera_anchor and is_instance_valid(impact_side_camera_anchor):
@@ -1270,6 +1366,17 @@ func _get_impact_side_camera_anchor() -> Node3D:
 			impact_side_camera_anchor = zezlan as Node3D
 			return impact_side_camera_anchor
 	return null
+
+func _get_sweep_exclusions() -> Array[RID]:
+	var exclusions: Array[RID] = []
+	_collect_collision_object_rids(self, exclusions)
+	return exclusions
+
+func _collect_collision_object_rids(node: Node, exclusions: Array[RID]) -> void:
+	if node is CollisionObject3D:
+		exclusions.append((node as CollisionObject3D).get_rid())
+	for child in node.get_children():
+		_collect_collision_object_rids(child, exclusions)
 
 func _has_shell_passed_target(bullet_pos: Vector3) -> bool:
 	var target_vector = target_hit_point - shot_muzzle_pos
@@ -1290,61 +1397,56 @@ func _resolve_missed_shot_at_target() -> void:
 	damage_number_script.display_text(target_hit_point, "MISS", get_tree().current_scene, Color.ORANGE_RED)
 	shot_resolved = true
 
-func _debug_report_predicted_hit_without_collision(bullet_pos: Vector3) -> void:
-	if not projectile_collision_debug_enabled:
-		return
-	if shot_collision_debug_reported or shot_resolved or not shot_will_hit_enemy:
-		return
-	shot_collision_debug_reported = true
-	print("[SHOT TRACE] predicted_hit=true but shell passed target without collision event target=", _fmt_debug_vec(target_hit_point), " shell=", _fmt_debug_vec(bullet_pos), " muzzle=", _fmt_debug_vec(shot_muzzle_pos), " likely=tunneling/missing collision layer/mask/or generated mesh collider gap")
-
 func _fmt_debug_vec(value: Vector3) -> String:
 	return "(%.2f, %.2f, %.2f)" % [value.x, value.y, value.z]
 
 func _get_impact_resolve_linger_time() -> float:
-	if impact_side_camera_enabled and impact_side_camera_active:
+	if impact_side_camera_active:
 		return max(0.0, impact_side_camera_track_after_resolve_time)
 	return 0.05
+
+func _end_cinematic() -> void:
+	cinematic_phase = 0
+	Engine.time_scale = 1.0
+	cinematic_camera.current = false
+	camera.current = true
+	combat_view_state = CombatViewState.NORMAL_VIEW
+	_set_analog_hud_visible(false)
+	_stop_analog_heartbeat()
+	active_shell = null
+	if combat_bark_ui:
+		combat_bark_ui.hide_bark()
+	_log_camera_switch("COCKPIT_RETURN")
 
 func _update_cinematic(delta: float):
 	cinematic_timer += delta
 
 	if cinematic_phase == 1:
 		cinematic_camera.fov = _get_fire_camera_fov()
-		if cinematic_timer >= 0.1:
-			if recoil_tween and recoil_tween.is_running():
-				recoil_tween.kill()
-				visual_barrel.position = visual_barrel_base_pos
-
-			cinematic_phase = 2
-			if not impact_side_camera_enabled:
-				cinematic_camera.global_position = impact_cam_pos
+		
+		# OVERRIDE: If the bullet hits while we are still watching the recoil, 
+		# jump to side-view immediately so we don't miss the impact.
+		if shot_resolved:
+			cinematic_phase = 3
+			_log_camera_switch("IMPACT_RESOLVED_LINGER_PREEMPTIVE")
+			_update_impact_side_camera_pose(target_hit_point, _get_impact_side_camera_world_position())
 			cinematic_timer = 0.0
 			return
 
-	if cinematic_phase == 2: # IMPACT CAM VIEW
-		if impact_side_camera_enabled:
-			_update_impact_side_camera(delta)
-		else:
-			_update_legacy_impact_camera(delta)
+		if cinematic_timer >= firecam_duration:
+			cinematic_phase = 2
+			_log_camera_switch("PHASE_2_IMPACT_TRACKING_START")
+			# Force an immediate position update so we don't spend a single frame at the muzzle
+			_update_impact_side_camera(0.0)
+			cinematic_timer = 0.0
+			return
+
+	if cinematic_phase == 2:
+		_update_impact_side_camera(delta)
 		return
 
 	if cinematic_phase == 3:
+		_update_impact_side_camera_pose(target_hit_point, _get_impact_side_camera_world_position())
 		if cinematic_timer >= _get_impact_resolve_linger_time():
-			cinematic_phase = 0
 			cinematic_timer = 0.0
-			return
-
-	if cinematic_phase == 0:
-		Engine.time_scale = 1.0 # Normal speed
-		if reload_timer >= reload_duration:
-			is_reloading = false
-
-		if combat_bark_ui:
-			combat_bark_ui.hide_bark()
-
-		cinematic_camera.current = false
-		camera.current = true
-		combat_view_state = CombatViewState.NORMAL_VIEW
-		_set_analog_hud_visible(false)
-		_stop_analog_heartbeat()
+			_end_cinematic()

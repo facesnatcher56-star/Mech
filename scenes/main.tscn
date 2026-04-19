@@ -89,14 +89,14 @@ font_color = Color(0.5, 0.5, 0.5, 1)
 [node name="Main" type="Node3D" unique_id=2077343884]
 
 [node name="REF_Alpha" type="Marker3D" parent="." unique_id=1714902305]
-transform = Transform3D(0.9999958, -0.0026753985, 0.0010842613, 0.002667536, 0.99997056, 0.007197732, -0.001103496, -0.007194807, 0.9999735, 44.00413, 1.3188925, 129.79524)
+transform = Transform3D(0.9999958, -0.0026753985, 0.0010842613, 0.002667536, 0.99997056, 0.007197732, -0.001103496, -0.007194807, 0.9999735, 44.00413, 1.3188925, 119.10844)
 gizmo_extents = 0.5
 
 [node name="Dot" type="MeshInstance3D" parent="REF_Alpha" unique_id=1936452529]
 mesh = SubResource("SphereMesh_ref")
 
 [node name="REF_Beta" type="Marker3D" parent="." unique_id=1382963939]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.3858, 0, 127.87355)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30.118, 0.026571989, -14.788)
 gizmo_extents = 0.5
 
 [node name="Dot" type="MeshInstance3D" parent="REF_Beta" unique_id=233014793]
@@ -128,11 +128,13 @@ mesh = SubResource("SphereMesh_aim_target")
 script = ExtResource("7_world_setup")
 
 [node name="WIPtestmech" parent="." unique_id=1679724251 instance=ExtResource("14_a8y0u")]
-transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 27.274748, 3.252451, -13.861531)
+transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 27.274748, 3.625, -13.861531)
 script = ExtResource("2_script")
-guncam_duration = 1.0
-impact_side_camera_time_scale = 0.3
+firecam_duration = 0.2
+impact_side_camera_trigger_distance = 60.0
+impact_side_camera_time_scale = 0.6
 miss_timeout = 1.0
+analog_heartbeat_volume_db = 4.0
 
 [node name="DirectionalSmoke" type="GPUParticles3D" parent="WIPtestmech/Armature" parent_id_path=PackedInt32Array(1679724251, 359783737) index="0" unique_id=641991123]
 transform = Transform3D(0.19957677, 0.7852611, -0.5861179, -0.96918815, 0.24632244, 0, 0.14437394, 0.5680583, 0.8102258, 0.7875495, 0.72992843, -0.87243533)
@@ -298,11 +300,11 @@ stage_3_stroke_speed = 2.0
 stage_4_stroke_speed = 1.5
 aim_build_speed = 0.06
 camera_stage_1_time = 4.0
-camera_stage_2_time = 4.0
-camera_stage_3_time = 7.0
-camera_stage_4_time = 8.0
-stage_1_fov = 70.0
-stage_2_fov = 60.0
+camera_stage_2_time = 3.0
+camera_stage_3_time = 4.0
+camera_stage_4_time = 5.0
+stage_1_fov = 60.0
+stage_2_fov = 55.0
 stage_3_fov = 50.0
 stage_4_fov = 40.0
 stage_5_fov = 30.0
@@ -326,7 +328,7 @@ grow_vertical = 2
 script = ExtResource("18_pause_menu")
 
 [node name="zezlan" parent="." unique_id=1717272107 instance=ExtResource("13_trceg")]
-transform = Transform3D(-5, 0, -4.371139e-07, 0, 5, 0, 4.371139e-07, 0, -5, 34.724888, -2.2839618, 154.95802)
+transform = Transform3D(-5, 0, -4.371139e-07, 0, 5, 0, 4.371139e-07, 0, -5, 34.724888, 3.625, 154.95802)
 script = ExtResource("20_zezlan_movement")
 local_travel_direction = Vector3(0, 0, 1)
 max_travel_speed = 8.0
@@ -349,6 +351,14 @@ transform = Transform3D(1, 0, 0, 0, 0.92407984, 0.38219967, 0, -0.38219967, 0.92
 keep_aspect = 0
 v_offset = -8.205
 far = 2000.0
+
+[node name="SideCamLeft" type="Marker3D" parent="." unique_id=39001302]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.793173, 5, 127.393265)
+gizmo_extents = 2.0
+
+[node name="SideCamRight" type="Marker3D" parent="." unique_id=39001303]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 47.358936, 5, 127.393265)
+gizmo_extents = 2.0
 
 [editable path="WIPtestmech"]
 [editable path="zezlan"]
