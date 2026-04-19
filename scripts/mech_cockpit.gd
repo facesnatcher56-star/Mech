@@ -407,6 +407,7 @@ func _setup_self_dossier_ui() -> void:
 	self_dossier_ui = TARGET_DOSSIER_UI.new()
 	self_dossier_ui.name = "SelfDossierUI"
 	self_dossier_ui.anchor_corner = TARGET_DOSSIER_UI.AnchorCorner.TOP_LEFT
+	self_dossier_ui.scale = Vector2(0.65, 0.65)
 	canvas_layer.add_child(self_dossier_ui)
 	self_dossier_ui.show_dossier(get_hp_snapshot())
 
@@ -737,6 +738,8 @@ func _get_fire_camera_fov() -> float:
 func _set_analog_hud_visible(is_visible: bool) -> void:
 	if analog_reticle_hud:
 		analog_reticle_hud.visible = is_visible
+	if self_dossier_ui:
+		self_dossier_ui.visible = (combat_view_state == CombatViewState.NORMAL_VIEW)
 
 func _intersect_target_ray(source_camera: Camera3D, max_distance: float) -> Dictionary:
 	var space_state = get_world_3d().direct_space_state
