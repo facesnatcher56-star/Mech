@@ -12,11 +12,11 @@
 [ext_resource type="Script" uid="uid://dgjcwck85kac5" path="res://scripts/directional_smoke.gd" id="15_directional_smoke"]
 [ext_resource type="Script" uid="uid://b3gcats3yakje" path="res://scripts/analog_reticle_hud.gd" id="16_analog_reticle"]
 [ext_resource type="Script" uid="uid://btwbp00nt72jd" path="res://scripts/combat_bark_ui.gd" id="17_bark_ui"]
-[ext_resource type="PackedScene" uid="uid://darrah5fxdvvq" path="res://assets/NPC/Meshy_AI_Ironclad_Sentinel_biped/Meshy_AI_Ironclad_Sentinel_biped/Meshy_AI_Ironclad_Sentinel_biped_Animation_Alert_withSkin.glb" id="18_dp3eg"]
 [ext_resource type="Script" uid="uid://dcd5tt8mgtcoe" path="res://scripts/pause_menu.gd" id="18_pause_menu"]
+[ext_resource type="PackedScene" uid="uid://dyvtvsrp0ycff" path="res://assets/NPC/Soldier/Meshy_AI_Ironclad_Sentinel_biped_Meshy_AI_Meshy_Merged_Animations.glb" id="19_gqmmt"]
 [ext_resource type="Script" uid="uid://j3cg73hci5u5" path="res://scripts/zezlan_camera_rig.gd" id="19_zezlan_camera"]
 [ext_resource type="Script" uid="uid://btwpt6uwt6me4" path="res://scripts/zezlan_movement_controller.gd" id="20_zezlan_movement"]
-[ext_resource type="PackedScene" path="res://scenes/crew_soldier.tscn" id="21_crew_soldier"]
+[ext_resource type="Script" uid="uid://cthmffaqbefjg" path="res://scripts/crew_soldier.gd" id="21_crew_soldier"]
 [ext_resource type="Script" uid="uid://c0y2se45h5trx" path="res://scripts/crew_order_ui.gd" id="22_crew_order_ui"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_ref"]
@@ -34,12 +34,12 @@ material = SubResource("StandardMaterial3D_aim_target")
 radius = 0.65
 height = 1.3
 
-[sub_resource type="Gradient" id="Gradient_0ld40"]
+[sub_resource type="Gradient" id="Gradient_dp3eg"]
 offsets = PackedFloat32Array(0, 0.1, 0.5, 1, 1)
 colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.114, 1, 1, 1, 0.0798, 1, 1, 1, 1, 1, 1, 1, 0)
 
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_gqmmt"]
-gradient = SubResource("Gradient_0ld40")
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_0ld40"]
+gradient = SubResource("Gradient_dp3eg")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_a8y0u"]
 direction = Vector3(-1, 10, 0)
@@ -51,9 +51,9 @@ damping_min = 4.0
 damping_max = 6.0
 scale_min = 1.5
 scale_max = 3.0
-color_ramp = SubResource("GradientTexture1D_gqmmt")
+color_ramp = SubResource("GradientTexture1D_0ld40")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_yc10j"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gqmmt"]
 transparency = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true
@@ -64,7 +64,7 @@ particles_anim_v_frames = 1
 particles_anim_loop = false
 
 [sub_resource type="QuadMesh" id="QuadMesh_smoke"]
-material = SubResource("StandardMaterial3D_yc10j")
+material = SubResource("StandardMaterial3D_gqmmt")
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_leg"]
 size = Vector3(0.25, 0.8, 0.25)
@@ -419,9 +419,6 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("18_pause_menu")
 
-[node name="CrewSoldier" parent="." unique_id=594193479 instance=ExtResource("21_crew_soldier")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19.473894, 0.001621306, -14.72044)
-
 [node name="zezlan" parent="." unique_id=1717272107 instance=ExtResource("13_trceg")]
 transform = Transform3D(-5, 0, -4.371139e-07, 0, 5, 0, 4.371139e-07, 0, -5, 34.724888, -0.4905479, 154.95802)
 script = ExtResource("20_zezlan_movement")
@@ -455,8 +452,66 @@ gizmo_extents = 2.0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 47.358936, 5, 127.393265)
 gizmo_extents = 2.0
 
-[node name="Meshy_AI_Ironclad_Sentinel_biped_Animation_Alert_withSkin" parent="." unique_id=809931932 instance=ExtResource("18_dp3eg")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.72386, -0.072223306, -10.001478)
+[node name="TestSoldier" parent="." unique_id=262171864 instance=ExtResource("19_gqmmt")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19.306843, 0, -8.458922)
+script = ExtResource("21_crew_soldier")
+
+[node name="Skeleton3D" parent="TestSoldier" index="0" unique_id=1677169462]
+bones/1/position = Vector3(2.1948059, 92.436264, 4.523448)
+bones/1/rotation = Quaternion(0.592296, 0.585548, 0.43458313, -0.3427195)
+bones/2/position = Vector3(-3.2299385, 9.68747, -9.02622)
+bones/2/rotation = Quaternion(-0.48193842, -0.67757726, 0.39866763, 0.38689604)
+bones/3/position = Vector3(1.7289049e-06, 40.122097, 7.855779e-06)
+bones/3/rotation = Quaternion(0.17891462, 0.008004338, -0.0012315474, 0.98383135)
+bones/4/position = Vector3(3.756361e-07, 37.664833, 1.8834104e-06)
+bones/4/rotation = Quaternion(-0.47704348, -0.088851966, 0.025139926, 0.8740154)
+bones/5/position = Vector3(-1.5525206e-06, 11.068106, -1.6069525e-06)
+bones/5/rotation = Quaternion(-0.27998516, 0.007082399, -0.018113276, 0.9598073)
+bones/6/position = Vector3(-2.5951097, -9.289201, -10.082188)
+bones/6/rotation = Quaternion(-0.47702628, -0.32202452, 0.5371863, 0.616585)
+bones/7/position = Vector3(-1.5280084e-06, 40.1344, -1.8465537e-06)
+bones/7/rotation = Quaternion(0.24027309, -0.07385118, -0.0056450954, 0.9678755)
+bones/8/position = Vector3(1.1999498e-06, 37.65595, 2.7410334e-07)
+bones/8/rotation = Quaternion(-0.60822195, -0.003347367, -0.021451391, 0.79347014)
+bones/9/position = Vector3(-1.0937129e-06, 11.007475, -1.7607545e-06)
+bones/9/rotation = Quaternion(-0.26111108, -0.011731859, 0.018512871, 0.96505994)
+bones/10/position = Vector3(5.8250628, -0.39827412, 11.63947)
+bones/10/rotation = Quaternion(0.60757715, 0.6046874, 0.41665208, 0.30266201)
+bones/11/position = Vector3(-9.316608e-09, 13.021826, -8.5809916e-07)
+bones/11/rotation = Quaternion(0.0148204565, 0.0030818763, -0.016211176, 0.9997541)
+bones/12/position = Vector3(-2.4253035e-07, 13.02178, -1.6585623e-06)
+bones/12/rotation = Quaternion(-0.01752576, -0.002924597, -0.013067741, 0.9997568)
+bones/13/position = Vector3(3.632378, 4.7499475, 0.074185185)
+bones/13/rotation = Quaternion(0.6223015, 0.43225268, -0.5145242, 0.40145165)
+bones/14/position = Vector3(-1.994427e-06, 14.4311495, -5.584843e-08)
+bones/14/rotation = Quaternion(0.5301831, 0.3308933, 0.038669076, 0.77969235)
+bones/15/position = Vector3(-5.8135015e-07, 21.589998, 1.7094862e-07)
+bones/15/rotation = Quaternion(-0.09095915, -0.09148321, -0.0550658, 0.99011374)
+bones/16/position = Vector3(-9.4603934e-07, 32.213844, 5.9903145e-06)
+bones/16/rotation = Quaternion(0.10570368, 0.025489517, 0.073499165, 0.99135005)
+bones/17/position = Vector3(-3.7791748, 4.787687, 0.1051125)
+bones/17/rotation = Quaternion(0.6230923, -0.43387163, 0.504572, 0.41099712)
+bones/18/position = Vector3(-6.061715e-07, 15.216165, 9.46883e-06)
+bones/18/rotation = Quaternion(0.26915118, -0.28948104, -0.2923696, 0.8707919)
+bones/19/position = Vector3(2.292254e-06, 21.58828, 3.7102545e-06)
+bones/19/rotation = Quaternion(-0.15044111, 0.09015468, -0.1601673, 0.9713837)
+bones/20/position = Vector3(-6.5607746e-06, 32.223614, 2.5458394e-06)
+bones/20/rotation = Quaternion(0.18577097, -0.09762733, -0.2220785, 0.9521761)
+bones/21/position = Vector3(0.14680098, 9.938711, -0.17930673)
+bones/21/rotation = Quaternion(-0.015217128, 0.012406759, 0.008019956, 0.99977505)
+bones/22/position = Vector3(-5.2873713e-07, 6.8015885, -6.0447182e-06)
+bones/22/rotation = Quaternion(0.46589527, 0.00013460593, -0.017653236, 0.8846638)
+bones/23/position = Vector3(0.089777045, 18.82436, -10.748551)
+bones/23/rotation = Quaternion(-0.25839534, -0.00013415838, -0.0031444328, 0.9660341)
+bones/24/position = Vector3(-0.08977742, 17.433783, 10.748567)
+bones/24/rotation = Quaternion(0.27274266, 6.2888354e-08, 0.0022781047, 0.96208435)
+
+[node name="RPGTube" type="Node3D" parent="TestSoldier" unique_id=953894008]
+transform = Transform3D(-4.371139e-08, -0.06975651, 0.9975641, 0, 0.9975641, 0.06975651, -1, 3.0498752e-09, -4.360493e-08, 0, 1.28, -0.24)
+
+[node name="Muzzle" type="Marker3D" parent="TestSoldier/RPGTube" unique_id=1897734595]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.58, 0)
 
 [editable path="WIPtestmech"]
 [editable path="zezlan"]
+[editable path="TestSoldier"]

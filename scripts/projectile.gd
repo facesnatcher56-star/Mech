@@ -15,7 +15,7 @@ extends Area3D
 @export var collision_debug_path_interval: float = 0.05
 ## If enabled, a swept ray hit resolves the shell immediately. If disabled, it only reports likely tunneling.
 @export var collision_debug_resolve_sweep_hits: bool = false
-var sparks_script = preload("res://scripts/impact_sparks.gd")
+const IMPACT_VFX = preload("res://scenes/impact_vfx.tscn")
 var shooter: Node3D = null
 var is_player_shot: bool = false
 var is_destined_for_hit: bool = false
@@ -126,10 +126,7 @@ func _resolve_hit(body, hit_pos: Vector3, source: String) -> void:
 	has_hit.emit(body, hit_pos)
 
 	# 1. Visual Payoff
-	if not is_player_shot:
-		var sparks = sparks_script.new()
-		get_tree().root.add_child(sparks)
-		sparks.global_position = hit_pos
+	_spawn_hit_vfx(hit_pos)
 	
 	# 2. Hit Logic (Recursive search for a 'hit' method)
 	var target = body
@@ -148,6 +145,12 @@ func _resolve_hit(body, hit_pos: Vector3, source: String) -> void:
 	
 	# 3. Cleanup
 	queue_free()
+
+func _spawn_hit_vfx(hit_pos: Vector3) -> void:
+	var vfx := IMPACT_VFX.instantiate()
+	get_tree().root.add_child(vfx)
+	vfx.global_position = hit_pos
+	vfx.setup(-global_transform.basis.z, false)
 
 func _describe_body(body) -> String:
 	if not body:

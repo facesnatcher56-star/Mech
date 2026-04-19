@@ -19,17 +19,17 @@ func _ready() -> void:
 func _resolve_hit(body, hit_pos: Vector3, source: String) -> void:
 	if _hit_resolved:
 		return
-	_spawn_explosion(hit_pos)
 	_detach_smoke_trail()
 	super._resolve_hit(body, hit_pos, source)
 
+func _spawn_hit_vfx(hit_pos: Vector3) -> void:
+	_spawn_explosion(hit_pos)
+
 func _spawn_explosion(hit_pos: Vector3) -> void:
-	if not explosion_scene:
-		return
-	var explosion = explosion_scene.instantiate()
-	get_tree().root.add_child(explosion)
-	if explosion is Node3D:
-		(explosion as Node3D).global_position = hit_pos
+	var vfx := IMPACT_VFX.instantiate()
+	get_tree().root.add_child(vfx)
+	vfx.global_position = hit_pos
+	vfx.setup(-global_transform.basis.z, true)
 
 func _detach_smoke_trail() -> void:
 	if not smoke_trail:

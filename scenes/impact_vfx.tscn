@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://b7nmk40j0b3jp"]
+
+[ext_resource type="Script" uid="uid://jnev0kpgv381" path="res://scripts/impact_vfx.gd" id="1_impact_vfx"]
+
+[node name="ImpactVFX" type="Node3D" unique_id=2050841296]
+script = ExtResource("1_impact_vfx")
+expl_pixel_size_large = 0.03
+debris_direction_override = Vector3(0, 0, -1)
+debris_spread = 10.0
+debris_count_small = 10
+debris_count_large = 12

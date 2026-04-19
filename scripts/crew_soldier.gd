@@ -31,6 +31,8 @@ const RPG_PROJECTILE = preload("res://scenes/rpg_projectile.tscn")
 @export var patrol_repick_time: float = 4.0
 ## Keeps the crewman's current world height instead of snapping to the mech height.
 @export var preserve_world_height: bool = true
+## How fast the crewman rotates toward his movement direction, in slerp weight per second. Low = gradual.
+@export var turn_speed: float = 2.0
 
 @export_group("Crew RPG")
 ## Chance from 0 to 1 that an ordered RPG shot is aimed to hit Zezlan.
@@ -54,6 +56,10 @@ const RPG_PROJECTILE = preload("res://scenes/rpg_projectile.tscn")
 ## How quickly floating dialogue fades away at the end.
 @export var dialogue_fade_time: float = 0.35
 
+@export_group("Crew Animation")
+## AnimationPlayer clip name to play while patrolling.
+@export var walk_animation: StringName = &"Walk_Backward_While_Shooting"
+
 var cooldown_timer: float = 0.0
 var rng := RandomNumberGenerator.new()
 var crew_label: Label3D
@@ -65,6 +71,7 @@ var patrol_target: Vector3 = Vector3.ZERO
 var patrol_timer: float = 0.0
 var patrol_height: float = 0.0
 var crew_order_ui: Control = null
+var _anim_player: AnimationPlayer = null
 
 func _ready() -> void:
 	rng.randomize()
@@ -74,6 +81,7 @@ func _ready() -> void:
 	_find_dialogue_labels()
 	_find_crew_order_ui()
 	_sync_crew_order_ui(true)
+	_anim_player = find_child("AnimationPlayer", true, false) as AnimationPlayer
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -108,6 +116,7 @@ func _find_patrol_anchor() -> void:
 
 func _update_patrol(delta: float) -> void:
 	if not patrol_enabled:
+		_set_walk_animation(false)
 		return
 	if not is_instance_valid(patrol_anchor):
 		_find_patrol_anchor()
@@ -122,11 +131,32 @@ func _update_patrol(delta: float) -> void:
 	var next_position := global_position.move_toward(patrol_target, max(0.0, patrol_speed) * delta)
 	if preserve_world_height:
 		next_position.y = patrol_height
+
+	var anchor_pos := patrol_anchor.global_position
+	var flat_to_soldier := Vector2(next_position.x - anchor_pos.x, next_position.z - anchor_pos.z)
+	var flat_dist := flat_to_soldier.length()
+	if flat_dist < patrol_min_radius and flat_dist > 0.001:
+		flat_to_soldier = flat_to_soldier.normalized() * patrol_min_radius
+		next_position.x = anchor_pos.x + flat_to_soldier.x
+		next_position.z = anchor_pos.z + flat_to_soldier.y
+
 	global_position = next_position
 
-	var look_target := Vector3(patrol_target.x, global_position.y, patrol_target.z)
-	if global_position.distance_to(look_target) > 0.05:
-		look_at(look_target, Vector3.UP)
+	var move_dir := Vector3(patrol_target.x - global_position.x, 0.0, patrol_target.z - global_position.z)
+	if move_dir.length_squared() > 0.0025:
+		var target_basis := Basis.looking_at(-move_dir.normalized(), Vector3.UP)
+		basis = basis.slerp(target_basis, clampf(turn_speed * delta, 0.0, 1.0))
+
+	_set_walk_animation(true)
+
+func _set_walk_animation(walking: bool) -> void:
+	if not _anim_player or walk_animation == &"":
+		return
+	if walking:
+		if _anim_player.current_animation != walk_animation:
+			_anim_player.play(walk_animation)
+	elif _anim_player.is_playing():
+		_anim_player.stop()
 
 func _pick_patrol_target() -> void:
 	patrol_timer = max(0.1, patrol_repick_time)

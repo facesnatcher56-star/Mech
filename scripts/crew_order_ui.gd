@@ -38,6 +38,12 @@ func _ready() -> void:
 	order_label.text = ""
 	response_label.text = ""
 	set_reload(0.0, 1.0)
+	_update_layout()
+	get_viewport().size_changed.connect(_update_layout)
+
+func _update_layout() -> void:
+	var vp := get_viewport_rect().size
+	set_position(Vector2(22.0, vp.y - size.y - 22.0))
 
 func _process(delta: float) -> void:
 	_display_reload_ratio = lerpf(_display_reload_ratio, _reload_ratio, min(1.0, delta * 9.0))

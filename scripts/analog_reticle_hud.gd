@@ -29,104 +29,126 @@ func set_solution(new_hit_chance: float, new_range_band: String, is_aligned: boo
 func _draw() -> void:
 	var center = size * 0.5
 	var v_size = get_viewport_rect().size
-	var current_ring_radius = v_size.y * ring_radius_ratio
+	var r = v_size.y * ring_radius_ratio
 	var font = get_theme_default_font()
-	
 	var t = Time.get_ticks_msec() * 0.001
 	var quality = clampf(hit_chance, 0.0, 1.0)
-	
-	# --- OLD TECH EFFECTS ---
-	var flicker = 0.97 + (sin(t * 50.0) * 0.02) + (sin(t * 120.0) * 0.01) # Stable shimmer
-	var h_color = hud_color
-	h_color.a *= flicker
-	var a_color = amber_color
-	a_color.a *= flicker
-	var c_color = cyan_color
-	c_color.a *= flicker
-	var shadow_color = Color(0.0, 0.0, 0.0, 0.9)
-	
-	var aperture_radius = current_ring_radius + 40.0
-	var aperture_color = Color(0.0, 0.0, 0.0, 0.99)
-	var glass_color = Color(0.03, 0.06, 0.03, 0.25)
-	
-	# --- 1. FULL-SCREEN OPTIC HOUSING ---
-	draw_rect(Rect2(0, 0, size.x, center.y - aperture_radius), aperture_color)
-	draw_rect(Rect2(0, center.y + aperture_radius, size.x, size.y - (center.y + aperture_radius)), aperture_color)
-	draw_rect(Rect2(0, center.y - aperture_radius, center.x - aperture_radius, aperture_radius * 2), aperture_color)
-	draw_rect(Rect2(center.x + aperture_radius, center.y - aperture_radius, size.x - (center.x + aperture_radius), aperture_radius * 2), aperture_color)
-	
-	var mask_segments = 96
-	for i in range(mask_segments):
-		var angle_a = TAU * float(i) / float(mask_segments)
-		var angle_b = TAU * float(i + 1) / float(mask_segments)
-		var inner_a = center + Vector2(cos(angle_a), sin(angle_a)) * aperture_radius
-		var inner_b = center + Vector2(cos(angle_b), sin(angle_b)) * aperture_radius
-		var corner_a = center + Vector2(sign(cos(angle_a)) * aperture_radius, sign(sin(angle_a)) * aperture_radius) if abs(cos(angle_a)) > 0.707 else center + Vector2(cos(angle_a) * (aperture_radius/abs(sin(angle_a))), sign(sin(angle_a)) * aperture_radius)
-		# (Simplified mask triangle logic for brevity, keeping existing polygon fill)
-		var p2 = inner_b
-		var p3 = center + Vector2(sign(cos(angle_b)) * aperture_radius, sign(sin(angle_b)) * aperture_radius)
-		draw_colored_polygon(PackedVector2Array([inner_a, inner_b, p3, p3]), aperture_color) # Re-drawing corners
+	var flicker = 0.97 + sin(t * 50.0) * 0.02 + sin(t * 120.0) * 0.01
 
-	# --- 2. THE BEZEL & STATUS LIGHTS ---
-	draw_arc(center, aperture_radius + 12.0, 0.0, TAU, 120, Color(0.12, 0.12, 0.12, 1.0), 24.0)
-	
-	# Bezier Status Lights (Old glowing bulbs)
-	for i in range(4):
-		var l_angle = PI * 1.25 + (i * 0.15)
-		var l_pos = center + Vector2(cos(l_angle), sin(l_angle)) * (aperture_radius + 20.0)
-		var l_color = Color.RED if quality < 0.5 else Color.DARK_GREEN
-		if i == 3 and quality > 0.8: l_color = Color.YELLOW
-		draw_circle(l_pos, 4.0, l_color.lerp(Color.WHITE, 0.3 * flicker))
+	var ap = r + 40.0
+	var black    = Color(0.00, 0.00, 0.00, 0.99)
+	var glass    = Color(0.02, 0.04, 0.02, 0.20)
+	var phosphor = Color(0.50, 0.58, 0.34, flicker)
+	var dim      = Color(0.22, 0.26, 0.15, 0.72)
+	var bead_dk  = Color(0.10, 0.12, 0.08, 0.92)
+	var bead_lt  = Color(0.32, 0.38, 0.22, 1.00)
+	var white    = Color(0.95, 0.95, 0.90, 1.00)
 
-	# Rivets
-	for i in range(16):
-		var screw_angle = (t * 0.02) + TAU * float(i) / 16.0
-		var screw_pos = center + Vector2(cos(screw_angle), sin(screw_angle)) * (aperture_radius + 22.0)
-		draw_circle(screw_pos, 7.0, Color(0.05, 0.05, 0.05, 1.0))
+	# --- APERTURE MASKING ---
+	draw_rect(Rect2(0, 0, size.x, center.y - ap), black)
+	draw_rect(Rect2(0, center.y + ap, size.x, size.y - (center.y + ap)), black)
+	draw_rect(Rect2(0, center.y - ap, center.x - ap, ap * 2.0), black)
+	draw_rect(Rect2(center.x + ap, center.y - ap, size.x - (center.x + ap), ap * 2.0), black)
+	var segs = 96
+	for i in range(segs):
+		var a0 = TAU * float(i) / float(segs)
+		var a1 = TAU * float(i + 1) / float(segs)
+		var p0 = center + Vector2(cos(a0), sin(a0)) * ap
+		var p1 = center + Vector2(cos(a1), sin(a1)) * ap
+		var am = (a0 + a1) * 0.5
+		var corner = center + Vector2(sign(cos(am)) * ap, sign(sin(am)) * ap)
+		draw_colored_polygon(PackedVector2Array([p0, p1, corner]), black)
+	draw_circle(center, ap, glass)
 
-	draw_circle(center, aperture_radius, glass_color)
-	
-	# --- 3. DYNAMIC HUD ELEMENTS ---
-	var rot_a = t * 0.3 * lerpf(1.0, 0.15, quality)
-	
-	for i in range(24):
-		var angle = rot_a + TAU * float(i) / 24.0
-		var dir = Vector2(cos(angle), sin(angle))
-		var color = active_marker_color if (i % 6 == 0) else secondary_marker_color
-		draw_line(center + dir * (current_ring_radius + 15), center + dir * (current_ring_radius + 35), color, 3.0)
+	# --- OUTER BEZEL ---
+	draw_arc(center, ap + 10.0, 0.0, TAU, 128, Color(0.06, 0.06, 0.05, 1.0), 22.0)
+	draw_arc(center, ap + 1.0,  0.0, TAU, 128, Color(0.18, 0.18, 0.14, 1.0),  2.5)
 
-	# Main Static Dial (Cyan accents)
-	draw_arc(center, current_ring_radius, 0.0, TAU, 160, c_color.darkened(0.4), 4.0)
-	
-	for i in range(120):
-		var major = i % 10 == 0
-		if major:
-			var angle = TAU * float(i) / 120.0
-			var direction = Vector2(cos(angle), sin(angle))
-			draw_line(center + direction * (current_ring_radius - major_tick_length), center + direction * current_ring_radius, h_color, 4.0)
+	# --- BEADED RING ---
+	var bead_count = 108
+	for i in range(bead_count):
+		var angle = TAU * float(i) / float(bead_count)
+		var bp = center + Vector2(cos(angle), sin(angle)) * r
+		var major = (i % 9 == 0)
+		draw_arc(bp, 4.5 if major else 3.2, 0.0, TAU, 10, bead_lt if major else bead_dk, 1.8 if major else 1.2)
 
-	# --- 4. CENTER STADIA ---
-	var stadia_half = (size.x * stadia_width_ratio) * 0.5
-	
-	# Main Crosshair
-	draw_line(center + Vector2(-15, 0), center + Vector2(15, 0), shadow_color, 6.0)
-	draw_line(center + Vector2(0, -15), center + Vector2(0, 15), shadow_color, 6.0)
-	draw_line(center + Vector2(-12, 0), center + Vector2(12, 0), h_color, 2.0)
-	draw_line(center + Vector2(0, -12), center + Vector2(0, 12), h_color, 2.0)
+	# --- ROTATING NUMBERED DIAL ---
+	var labels = ["MG", "0", "4", "6", "8", "10", "12", "14", "16", "18", "20", "22", "24", "26", "28", "30", "32", "34", "36", "MWF"]
+	var dial_rot = t * 0.04 * lerpf(1.2, 0.08, quality) - PI * 0.5
+	for i in range(labels.size()):
+		var angle = dial_rot + TAU * float(i) / float(labels.size())
+		var lp = center + Vector2(cos(angle), sin(angle)) * (r + 28.0)
+		draw_string(font, lp - Vector2(9.0, -4.0), labels[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, dim)
 
-	# --- 5. CALIBRATING PLATES ---
-	# Range Plate (Cyan) - Stationary
-	var plate_range_pos = center + Vector2(-current_ring_radius * 0.75, -current_ring_radius * 0.65)
-	_draw_instrument_plate(plate_range_pos, Vector2(180, 60), "RANGE [STADIA]", range_band, c_color, font)
-	
-	# Hit Chance Plate (Amber) - Stationary
-	var plate_hit_pos = center + Vector2(current_ring_radius * 0.35, current_ring_radius * 0.55)
-	var percent_text = str(roundi(hit_chance * 100.0)) + "%"
-	_draw_instrument_plate(plate_hit_pos, Vector2(200, 80), "SOLN QUALITY", percent_text, a_color, font, 42)
+	# --- INNER TICK MARKS ---
+	for i in range(40):
+		var angle = TAU * float(i) / 40.0
+		var d = Vector2(cos(angle), sin(angle))
+		var major = (i % 5 == 0)
+		draw_line(center + d * (r - (22.0 if major else 10.0)), center + d * (r - 2.0),
+				phosphor if major else dim, 2.0 if major else 1.0)
 
-func _draw_instrument_plate(pos: Vector2, rect_size: Vector2, title: String, value: String, accent_color: Color, font: Font, val_size: int = 32):
-	var rect = Rect2(pos, rect_size)
-	draw_rect(rect, Color(0, 0, 0, 0.85), true)
-	draw_rect(rect, accent_color.darkened(0.6), false, 2.0)
-	draw_string(font, rect.position + Vector2(10, 20), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, accent_color.darkened(0.4))
-	draw_string(font, rect.position + Vector2(10, rect.size.y - 15), value, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 20, val_size, accent_color)
+	# --- HORIZONTAL SWEEP LINE + TRIANGLES ---
+	var sweep  = (sin(t * 1.8) * 0.55 + sin(t * 2.93) * 0.28 + sin(t * 0.47) * 0.17) * (1.0 - quality * 0.72) * r * 0.36
+	var lx0    = center.x - r * 0.94
+	var lx1    = center.x + r * 0.94
+	draw_line(Vector2(lx0, center.y), Vector2(lx1, center.y), dim, 1.5)
+	for i in range(9):
+		var lx = lx0 + (lx1 - lx0) * float(i) / 8.0
+		var h  = 10.0 if (i % 4 == 0) else 5.0
+		draw_line(Vector2(lx, center.y - h * 0.5), Vector2(lx, center.y + h * 0.5), dim, 1.0)
+	var spread = (1.0 - quality) * r * 0.32 + 18.0
+	for tx in [-spread * 1.55, -spread, -spread * 0.42, spread * 0.42, spread, spread * 1.55]:
+		_draw_tri(Vector2(center.x + tx + sweep * 0.25, center.y), 5.0, dim)
+	_draw_tri(Vector2(center.x + sweep, center.y), 9.0, phosphor)
+
+	# --- CROSSHAIR ---
+	draw_line(center + Vector2(-14, 0), center + Vector2(14, 0), Color(0, 0, 0, 0.85), 5.0)
+	draw_line(center + Vector2(0, -14), center + Vector2(0, 14), Color(0, 0, 0, 0.85), 5.0)
+	draw_line(center + Vector2(-11, 0), center + Vector2(11, 0), phosphor, 1.5)
+	draw_line(center + Vector2(0, -11), center + Vector2(0, 11), phosphor, 1.5)
+
+	# --- RANGE LABEL (top-center, inside ring) ---
+	var rw = 110.0
+	var rh = 28.0
+	var rp = Vector2(center.x - rw * 0.5, center.y - r * 0.82)
+	draw_rect(Rect2(rp, Vector2(rw, rh)), Color(0, 0, 0, 0.88), true)
+	draw_rect(Rect2(rp, Vector2(rw, rh)), dim, false, 1.0)
+	draw_string(font, rp + Vector2(rw * 0.5 - 18.0, rh - 8.0), range_band, HORIZONTAL_ALIGNMENT_LEFT, rw - 12.0, 14, white)
+
+	# --- SOLUTION QUALITY GAUGE (mechanical instrument housing) ---
+	var gw    = 210.0
+	var gh    = 88.0
+	var gx    = center.x + r * 0.30
+	var gy    = center.y + r * 0.44
+	var grect = Rect2(gx, gy, gw, gh)
+
+	# Housing
+	draw_rect(grect, Color(0.0, 0.0, 0.0, 0.88), true)
+	draw_rect(grect, dim, false, 2.0)
+	draw_rect(Rect2(gx + 4, gy + 4, gw - 8, gh - 8), dim.darkened(0.5), false, 1.0)
+	# Corner rivets
+	for cx2 in [gx + 7, gx + gw - 7]:
+		for cy2 in [gy + 7, gy + gh - 7]:
+			draw_circle(Vector2(cx2, cy2), 3.0, dim)
+
+	# Large percentage number
+	var pct = "%.1f%%" % (quality * 100.0)
+	draw_string(font, Vector2(gx + 12, gy + 52), pct, HORIZONTAL_ALIGNMENT_LEFT, -1, 46, white)
+
+	# Scale bar with tick marks
+	var bar_rect = Rect2(gx + 10, gy + gh - 20, gw - 20, 8)
+	draw_rect(bar_rect, Color(0.04, 0.05, 0.03, 1.0), true)
+	draw_rect(Rect2(bar_rect.position, Vector2(bar_rect.size.x * quality, bar_rect.size.y)), phosphor, true)
+	draw_rect(bar_rect, dim.darkened(0.2), false, 1.0)
+	for i in range(11):
+		var tx2 = bar_rect.position.x + bar_rect.size.x * float(i) / 10.0
+		var th  = 5.0 if (i % 5 == 0) else 3.0
+		draw_line(Vector2(tx2, bar_rect.position.y - th), Vector2(tx2, bar_rect.position.y), dim, 1.0)
+
+func _draw_tri(pos: Vector2, half: float, color: Color) -> void:
+	draw_colored_polygon(PackedVector2Array([
+		pos + Vector2(-half, -half),
+		pos + Vector2( half, -half),
+		pos + Vector2(0.0,   half * 0.7),
+	]), color)
