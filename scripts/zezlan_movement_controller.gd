@@ -62,20 +62,199 @@ extends Node3D
 ## Prints one line for each generated mesh collider. Disable if the startup log gets too noisy.
 @export var collision_debug_log_each_collider: bool = true
 
+@export_group("Zezlan HP")
+## Total enemy structure pool shown in the target dossier.
+@export var max_structure_hp: int = 100
+## Torso armor pool. Reaching zero destroys Zezlan.
+@export var max_torso_hp: int = 60
+## Left leg armor pool. Reaching zero marks the leg broken in the UI only.
+@export var max_left_leg_hp: int = 40
+## Right leg armor pool. Reaching zero marks the leg broken in the UI only.
+@export var max_right_leg_hp: int = 40
+## Damage applied to total structure and torso on torso hits.
+@export var torso_hit_damage: int = 18
+## Damage applied to total structure and the matching leg on leg hits.
+@export var leg_hit_damage: int = 14
+## Damage applied to total structure if an unmapped Zezlan mesh is hit.
+@export var fallback_hit_damage: int = 18
+
 var target_throttle: float = 0.0
 var current_travel_speed: float = 0.0
 var current_animation_speed: float = 0.0
 var braking_to_stop: bool = false
 var animation_player: AnimationPlayer
+var structure_hp: int = 100
+var torso_hp: int = 60
+var left_leg_hp: int = 40
+var right_leg_hp: int = 40
+var is_destroyed: bool = false
+var _broken_parts := {}
+var damage_number_script = preload("res://scripts/damage_number.gd")
+
+signal hp_changed(snapshot: Dictionary)
 
 func _ready() -> void:
 	add_to_group(collision_group_name)
+	_reset_hp_pools()
 	if build_mesh_collision_on_ready:
 		_build_mesh_colliders()
 
 	animation_player = _find_animation_player(self)
 	if animation_player and animation_enabled:
 		animation_player.speed_scale = 0.0
+
+func _reset_hp_pools() -> void:
+	structure_hp = max(0, max_structure_hp)
+	torso_hp = max(0, max_torso_hp)
+	left_leg_hp = max(0, max_left_leg_hp)
+	right_leg_hp = max(0, max_right_leg_hp)
+	is_destroyed = false
+	_broken_parts.clear()
+
+func apply_shell_damage(hit_body: Node, hit_pos: Vector3) -> Dictionary:
+	if is_destroyed:
+		return {
+			"applied": false,
+			"damage": 0,
+			"region": "DESTROYED",
+			"part_key": "destroyed",
+			"snapshot": get_hp_snapshot()
+		}
+
+	var region := _get_hit_region(hit_body)
+	var part_key := _region_to_part_key(region)
+	var damage := _get_damage_for_region(region)
+	var before_part_hp := _get_part_hp(region)
+
+	structure_hp = maxi(0, structure_hp - damage)
+	match region:
+		"TORSO":
+			torso_hp = maxi(0, torso_hp - damage)
+		"LEFT LEG":
+			left_leg_hp = maxi(0, left_leg_hp - damage)
+		"RIGHT LEG":
+			right_leg_hp = maxi(0, right_leg_hp - damage)
+
+	var part_broken := before_part_hp > 0 and _get_part_hp(region) <= 0 and region != "STRUCTURE"
+	if part_broken:
+		_broken_parts[region] = true
+
+	if structure_hp <= 0 or torso_hp <= 0:
+		_destroy_zezlan()
+
+	damage_number_script.display_text(hit_pos + Vector3.UP * 0.5, "-%d" % damage, get_tree().current_scene, Color(1.0, 0.78, 0.12))
+	if part_broken:
+		damage_number_script.display_text(hit_pos + Vector3.UP * 1.2, "BROKEN", get_tree().current_scene, Color(1.0, 0.25, 0.1))
+
+	var snapshot := get_hp_snapshot()
+	hp_changed.emit(snapshot)
+	return {
+		"applied": true,
+		"damage": damage,
+		"region": region,
+		"part_key": part_key,
+		"part_broken": part_broken,
+		"destroyed": is_destroyed,
+		"snapshot": snapshot
+	}
+
+func get_hp_snapshot() -> Dictionary:
+	return {
+		"name": "ZEZLAN",
+		"structure": {"current": structure_hp, "max": max_structure_hp},
+		"parts": {
+			"torso": {"label": "TORSO", "current": torso_hp, "max": max_torso_hp, "broken": torso_hp <= 0},
+			"left_leg": {"label": "LEFT LEG", "current": left_leg_hp, "max": max_left_leg_hp, "broken": left_leg_hp <= 0},
+			"right_leg": {"label": "RIGHT LEG", "current": right_leg_hp, "max": max_right_leg_hp, "broken": right_leg_hp <= 0}
+		},
+		"destroyed": is_destroyed
+	}
+
+func apply_rpg_structure_damage(damage: int, hit_pos: Vector3) -> Dictionary:
+	if is_destroyed:
+		return {
+			"applied": false,
+			"damage": 0,
+			"region": "STRUCTURE",
+			"part_key": "structure",
+			"destroyed": true,
+			"snapshot": get_hp_snapshot()
+		}
+
+	var applied_damage: int = maxi(0, damage)
+	structure_hp = maxi(0, structure_hp - applied_damage)
+	if structure_hp <= 0:
+		_destroy_zezlan()
+
+	damage_number_script.display_text(hit_pos + Vector3.UP * 0.75, "-%d RPG" % applied_damage, get_tree().current_scene, Color(1.0, 0.58, 0.16))
+
+	var snapshot := get_hp_snapshot()
+	hp_changed.emit(snapshot)
+	return {
+		"applied": true,
+		"damage": applied_damage,
+		"region": "STRUCTURE",
+		"part_key": "structure",
+		"destroyed": is_destroyed,
+		"snapshot": snapshot
+	}
+
+func _get_hit_region(hit_body: Node) -> String:
+	var node := hit_body
+	while node:
+		var node_name := node.name.to_lower()
+		if "torso" in node_name:
+			return "TORSO"
+		if "footl" in node_name or "kneel" in node_name or "legl" in node_name:
+			return "LEFT LEG"
+		if "footr" in node_name or "kneer" in node_name or "legr" in node_name:
+			return "RIGHT LEG"
+		node = node.get_parent()
+	return "STRUCTURE"
+
+func _region_to_part_key(region: String) -> String:
+	match region:
+		"TORSO":
+			return "torso"
+		"LEFT LEG":
+			return "leftleg"
+		"RIGHT LEG":
+			return "rightleg"
+		_:
+			return "torso"
+
+func _get_damage_for_region(region: String) -> int:
+	match region:
+		"TORSO":
+			return max(0, torso_hit_damage)
+		"LEFT LEG", "RIGHT LEG":
+			return max(0, leg_hit_damage)
+		_:
+			return max(0, fallback_hit_damage)
+
+func _get_part_hp(region: String) -> int:
+	match region:
+		"TORSO":
+			return torso_hp
+		"LEFT LEG":
+			return left_leg_hp
+		"RIGHT LEG":
+			return right_leg_hp
+		_:
+			return structure_hp
+
+func _destroy_zezlan() -> void:
+	if is_destroyed:
+		return
+	is_destroyed = true
+	target_throttle = 0.0
+	current_travel_speed = 0.0
+	current_animation_speed = 0.0
+	movement_enabled = false
+	if animation_player:
+		animation_player.speed_scale = 0.0
+		if stop_animation_when_idle and animation_player.is_playing():
+			animation_player.stop()
 
 func _process(delta: float) -> void:
 	_update_throttle_input(delta)

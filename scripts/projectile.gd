@@ -3,6 +3,8 @@ extends Area3D
 ## World units per second that the shell travels.
 @export var speed: float = 150.0
 @export_group("Collision Debug")
+## Enables silent swept collision resolution for fast projectiles. Useful for RPGs and other small high-speed shots.
+@export var swept_collision_enabled: bool = false
 ## Prints shell path, swept ray hits, Area3D collision hits, and lifetime cleanup.
 @export var collision_debug_enabled: bool = false
 ## Physics mask used by the debug sweep ray. Default 1 matches the shell collider.
@@ -49,6 +51,8 @@ func _physics_process(delta):
 	var from_pos = global_position
 	var to_pos = from_pos + (-global_transform.basis.z * speed * delta)
 	_trace_sweep(from_pos, to_pos, delta)
+	if _hit_resolved:
+		return
 	global_position = to_pos
 	_last_position = to_pos
 
@@ -72,7 +76,7 @@ func _on_body_entered(body):
 	_resolve_hit(body, hit_pos, "area")
 
 func _trace_sweep(from_pos: Vector3, to_pos: Vector3, delta: float) -> void:
-	if not collision_debug_enabled:
+	if not collision_debug_enabled and not swept_collision_enabled:
 		return
 
 	_path_log_timer += delta
@@ -95,8 +99,9 @@ func _trace_sweep(from_pos: Vector3, to_pos: Vector3, delta: float) -> void:
 	if not body:
 		return
 
-	print("[SHELL TRACE] SWEEP WOULD HIT body=", _describe_body(body), " from=", _fmt_vec(from_pos), " to=", _fmt_vec(to_pos), " hit=", _fmt_vec(result.position), " normal=", _fmt_vec(result.normal), " note=ray crossed collider this frame")
-	if collision_debug_resolve_sweep_hits:
+	if collision_debug_enabled:
+		print("[SHELL TRACE] SWEEP WOULD HIT body=", _describe_body(body), " from=", _fmt_vec(from_pos), " to=", _fmt_vec(to_pos), " hit=", _fmt_vec(result.position), " normal=", _fmt_vec(result.normal), " note=ray crossed collider this frame")
+	if swept_collision_enabled or collision_debug_resolve_sweep_hits:
 		_resolve_hit(body, result.position, "sweep")
 
 func _get_sweep_exclusions() -> Array[RID]:

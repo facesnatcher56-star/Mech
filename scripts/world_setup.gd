@@ -16,8 +16,9 @@ func _ready():
 	
 	# 1. Procedural Grass Ground
 	var floor_mesh = CSGBox3D.new()
-	floor_mesh.size = Vector3(500, 1, 500)
-	floor_mesh.position = Vector3(0, -2.5, 0)
+	floor_mesh.size = Vector3(2000, 1, 2000)
+	floor_mesh.position = Vector3(0, -0.5, 0) # Top surface at 0.0
+
 	floor_mesh.use_collision = true
 	
 	var floor_mat = StandardMaterial3D.new()

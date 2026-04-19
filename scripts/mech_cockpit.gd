@@ -4,6 +4,7 @@ extends Node3D
 @onready var cockpit_mesh = self
 const PROJECTILE = preload("res://scenes/projectile.tscn")
 const DEFAULT_ANALOG_HEARTBEAT = preload("res://assets/Sounds/heartbeats-61.wav")
+const TARGET_DOSSIER_UI = preload("res://scripts/target_dossier_ui.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -39,9 +40,15 @@ var muzzle: Node3D
 @export var main_fov: float = 75.0
 ## Maximum possible zoom in (Tight view).
 @export var min_fov_limit: float = 40.0
-## Maximum possible zoom out (Wide view).
-@export var max_fov_limit: float = 140.0
+## Maximum optical zoom out. Keep this below fisheye territory; extra wide view comes from camera pullback.
+@export var max_fov_limit: float = 82.0
 @export var zoom_sensitivity: float = 5.0
+## FOV where zoom-out starts physically pulling the camera back instead of widening the lens further.
+@export var zoom_dolly_start_fov: float = 75.0
+## Local camera offset applied at maximum zoom-out to avoid fishbowl distortion.
+@export var max_zoom_out_dolly_offset: Vector3 = Vector3(0.0, 0.0, -4.0)
+## How quickly the main camera physically settles into the zoom-out offset.
+@export var zoom_dolly_blend_speed: float = 10.0
 
 @export_group("Gun Cam")
 ## FOV used during the gun-cam dolly-in transition.
@@ -189,6 +196,8 @@ var aim_camera_session_start: Vector3 = Vector3.ZERO
 var aim_camera_session_target: Vector3 = Vector3.ZERO
 var aim_camera_chunk_stage: int = 0
 var analog_heartbeat_player: AudioStreamPlayer
+var target_dossier_ui: Control = null
+var main_camera_base_position: Vector3 = Vector3.ZERO
 
 # --- CAMERA DEBUG TRACKING ---
 var _debug_cam_last_switch_time: float = 0.0
@@ -313,6 +322,8 @@ func _ready():
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 	if camera:
+		main_camera_base_position = camera.position
+		main_fov = clampf(main_fov, min_fov_limit, max_fov_limit)
 		camera.make_current()
 		original_camera_rotation = camera.rotation
 		camera.fov = main_fov
@@ -326,6 +337,7 @@ func _ready():
 	cinematic_camera.current = false
 	_setup_analog_heartbeat_player()
 	get_tree().root.call_deferred("add_child", cinematic_camera)
+	call_deferred("_setup_target_dossier_ui")
 	if camera_debug_hud_enabled:
 		call_deferred("_setup_debug_hud")
 
@@ -352,6 +364,64 @@ func _play_analog_heartbeat() -> void:
 func _stop_analog_heartbeat() -> void:
 	if analog_heartbeat_player:
 		analog_heartbeat_player.stop()
+
+func _setup_target_dossier_ui() -> void:
+	var canvas_layer = get_node_or_null("CanvasLayer")
+	if not canvas_layer:
+		return
+	target_dossier_ui = TARGET_DOSSIER_UI.new()
+	target_dossier_ui.name = "TargetDossierUI"
+	canvas_layer.add_child(target_dossier_ui)
+
+func _show_target_dossier() -> void:
+	if not target_dossier_ui:
+		return
+	var snapshot := _get_current_target_hp_snapshot()
+	if snapshot.is_empty():
+		target_dossier_ui.hide_dossier()
+	else:
+		target_dossier_ui.show_dossier(snapshot)
+
+func _hide_target_dossier() -> void:
+	if target_dossier_ui:
+		target_dossier_ui.hide_dossier()
+
+func _get_current_target_hp_snapshot() -> Dictionary:
+	var target := _get_analog_target_node()
+	var damage_model := _find_damage_model_node(target)
+	if damage_model and damage_model.has_method("get_hp_snapshot"):
+		return damage_model.get_hp_snapshot()
+	for node in get_tree().get_nodes_in_group("enemy"):
+		if node is Node:
+			damage_model = _find_damage_model_node(node)
+			if damage_model and damage_model.has_method("get_hp_snapshot"):
+				return damage_model.get_hp_snapshot()
+	return {}
+
+func _find_damage_model_node(start_node: Node) -> Node:
+	var node := start_node
+	while node:
+		if node.has_method("apply_shell_damage") and node.has_method("get_hp_snapshot"):
+			return node
+		node = node.get_parent()
+	return null
+
+func _apply_enemy_damage(body: Node, hit_pos: Vector3) -> Dictionary:
+	var damage_model := _find_damage_model_node(body)
+	if not damage_model or not damage_model.has_method("apply_shell_damage"):
+		return {}
+
+	var result: Dictionary = damage_model.apply_shell_damage(body, hit_pos)
+	if target_dossier_ui and result.has("snapshot"):
+		var damage := int(result.get("damage", 0))
+		var region := str(result.get("region", "STRUCTURE"))
+		var line := "HIT %s  -%d" % [region, damage]
+		if bool(result.get("part_broken", false)):
+			line = "%s BROKEN" % region
+		if bool(result.get("destroyed", false)):
+			line = "TARGET DESTROYED"
+		target_dossier_ui.show_impact_line(line, str(result.get("part_key", "")), result["snapshot"])
+	return result
 
 func _setup_big_gun():
 	visual_barrel = find_child("RightArm", true)
@@ -394,11 +464,16 @@ func _process(delta):
 
 	# Butter-Smooth Blend
 	if camera and not is_transitioning:
+		main_fov = clampf(main_fov, min_fov_limit, max_fov_limit)
 		var target_fov = main_fov
 		var blend_speed = 10.0
 		# Adjust delta to ignore slomo so zoom stays fast
 		var real_delta = delta / Engine.time_scale if Engine.time_scale > 0.001 else delta
 		camera.fov = lerpf(camera.fov, target_fov, blend_speed * real_delta)
+		var dolly_denominator = maxf(0.001, max_fov_limit - zoom_dolly_start_fov)
+		var dolly_alpha = clampf((target_fov - zoom_dolly_start_fov) / dolly_denominator, 0.0, 1.0)
+		var target_camera_position = main_camera_base_position + (max_zoom_out_dolly_offset * dolly_alpha)
+		camera.position = camera.position.lerp(target_camera_position, zoom_dolly_blend_speed * real_delta)
 
 	if damage_flash_timer > 0.0:
 		damage_flash_timer = max(0.0, damage_flash_timer - delta)
@@ -642,6 +717,7 @@ func _enter_analog_aim_view() -> void:
 	cinematic_camera.current = true
 	_set_analog_hud_visible(true)
 	_play_analog_heartbeat()
+	_show_target_dossier()
 	var gun_camera = _get_gun_camera_marker()
 	aim_camera_session_start = gun_camera.global_position if gun_camera else cinematic_camera.global_position
 	aim_camera_session_target = _get_analog_camera_target_point()
@@ -1167,13 +1243,22 @@ func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool):
 
 		target_hit_point = hit_pos
 		var is_enemy = _is_enemy_collider(body)
+		var damage_result: Dictionary = {}
+		var bark_part_name := ""
+		if is_enemy:
+			bark_part_name = body.name
+			damage_result = _apply_enemy_damage(body, hit_pos)
+			if not damage_result.is_empty() and str(damage_result.get("part_key", "")) != "":
+				bark_part_name = str(damage_result.get("part_key", ""))
 		shot_resolved = true
 
 		if combat_bark_ui:
-			combat_bark_ui.show_result(is_enemy, body.name if is_enemy else "")
+			combat_bark_ui.show_result(is_enemy, bark_part_name if is_enemy else "")
 
 		if not is_enemy and not has_missed_shot:
 			has_missed_shot = true
+			if target_dossier_ui:
+				target_dossier_ui.show_impact_line("NO DAMAGE", "", _get_current_target_hp_snapshot())
 			var damage_number_script = preload("res://scripts/damage_number.gd")
 			damage_number_script.display_text(hit_pos, "MISS", get_tree().current_scene, Color.ORANGE_RED)
 		elif is_enemy:
@@ -1366,6 +1451,8 @@ func _resolve_missed_shot_at_target() -> void:
 	has_missed_shot = true
 	if combat_bark_ui:
 		combat_bark_ui.show_result(false)
+	if target_dossier_ui:
+		target_dossier_ui.show_impact_line("NO DAMAGE", "", _get_current_target_hp_snapshot())
 	var damage_number_script = preload("res://scripts/damage_number.gd")
 	damage_number_script.display_text(target_hit_point, "MISS", get_tree().current_scene, Color.ORANGE_RED)
 	shot_resolved = true
@@ -1386,6 +1473,7 @@ func _end_cinematic() -> void:
 	combat_view_state = CombatViewState.NORMAL_VIEW
 	_set_analog_hud_visible(false)
 	_stop_analog_heartbeat()
+	_hide_target_dossier()
 	active_shell = null
 	if combat_bark_ui:
 		combat_bark_ui.hide_bark()

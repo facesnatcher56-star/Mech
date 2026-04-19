@@ -21,9 +21,21 @@ func _physics_process(delta):
 	# --- Ground Alignment ---
 	var space_state = get_world_3d().direct_space_state
 	var ground_query = PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 2.0, global_position + Vector3.DOWN * 5.0)
+	
+	# Fix: Exclude the enemy's own hitboxes from its ground check
+	var exclusions: Array[RID] = []
+	_collect_collision_object_rids(self, exclusions)
+	ground_query.exclude = exclusions
+	
 	var ground_res = space_state.intersect_ray(ground_query)
 	if ground_res:
-		global_position.y = ground_res.position.y + 0.05
+		global_position.y = ground_res.position.y + 3.625
+
+func _collect_collision_object_rids(node: Node, exclusions: Array[RID]) -> void:
+	if node is CollisionObject3D:
+		exclusions.append((node as CollisionObject3D).get_rid())
+	for child in node.get_children():
+		_collect_collision_object_rids(child, exclusions)
 
 func fire_at_player():
 	# Firing disabled
