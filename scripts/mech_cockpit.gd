@@ -25,8 +25,8 @@ var reload_duration: float = 2.5
 @onready var analog_reticle_hud = get_node_or_null("CanvasLayer/AnalogReticleHUD")
 @onready var combat_bark_ui = get_node_or_null("CanvasLayer/CombatBarkUI")
 @onready var cannon_sound = find_child("CannonSound", true)
-var hit_sound = find_child("HitSound", true)
-var miss_sound = find_child("MissSound", true)
+@onready var hit_sound = find_child("HitSound", true)
+@onready var side_cam_mortar_sound = find_child("SideCamMortarSound", true)
 
 var visual_barrel: Node3D
 
@@ -76,13 +76,8 @@ var muzzle: Node3D
 @export var impact_side_camera_look_at_height_bias: float = 0.0
 ## Per-frame blend toward the side camera position. 1.0 snaps instantly.
 @export_range(0.0, 1.0, 0.05) var impact_side_camera_position_blend: float = 1.0
-## How long to hold the side camera after hit or miss resolution before returning.
-@export var impact_side_camera_track_after_resolve_time: float = 0.15
-
-@export_group("Miss/Linger")
-@export var linger_duration: float = 1.0
-@export var miss_timeout: float = 2.0
-@export var near_miss_sound_distance: float = 4.0
+## How long to hold on the side cam after impact before returning to cockpit (game-time seconds).
+@export var impact_side_camera_linger_duration: float = 1.5
 
 @export_group("Analog Aim")
 @export var aim_settle_speed: float = 0.045
@@ -337,20 +332,11 @@ func _ready():
 func _setup_analog_heartbeat_player() -> void:
 	analog_heartbeat_player = AudioStreamPlayer.new()
 	analog_heartbeat_player.name = "AnalogHeartbeat"
-	analog_heartbeat_player.stream = _make_looping_heartbeat_stream()
+	analog_heartbeat_player.stream = analog_heartbeat_stream
 	analog_heartbeat_player.volume_db = analog_heartbeat_volume_db
 	analog_heartbeat_player.pitch_scale = analog_heartbeat_pitch_scale
 	cinematic_camera.add_child(analog_heartbeat_player)
-
-	if not analog_heartbeat_player.finished.is_connected(_on_analog_heartbeat_finished):
-		analog_heartbeat_player.finished.connect(_on_analog_heartbeat_finished)
-
-func _make_looping_heartbeat_stream() -> AudioStream:
-	if analog_heartbeat_stream is AudioStreamWAV:
-		var wav := analog_heartbeat_stream.duplicate() as AudioStreamWAV
-		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		return wav
-	return analog_heartbeat_stream
+	analog_heartbeat_player.finished.connect(_on_analog_heartbeat_finished)
 
 func _on_analog_heartbeat_finished() -> void:
 	if combat_view_state == CombatViewState.ANALOG_AIM_VIEW and analog_heartbeat_player:
@@ -359,29 +345,21 @@ func _on_analog_heartbeat_finished() -> void:
 func _play_analog_heartbeat() -> void:
 	if not analog_heartbeat_player or not analog_heartbeat_stream:
 		return
-	analog_heartbeat_player.stream = _make_looping_heartbeat_stream()
 	analog_heartbeat_player.volume_db = analog_heartbeat_volume_db
 	analog_heartbeat_player.pitch_scale = analog_heartbeat_pitch_scale
-	if not analog_heartbeat_player.playing:
-		analog_heartbeat_player.play()
+	analog_heartbeat_player.play()
 
 func _stop_analog_heartbeat() -> void:
-	if analog_heartbeat_player and analog_heartbeat_player.playing:
+	if analog_heartbeat_player:
 		analog_heartbeat_player.stop()
 
 func _setup_big_gun():
-	# Find the RightArm in the armature to act as our barrel/muzzle source
 	visual_barrel = find_child("RightArm", true)
 
 	if visual_barrel:
-		# Setup muzzle at the tip of the right arm/gun
 		muzzle = visual_barrel.get_node_or_null("Muzzle")
 		if not muzzle:
-			muzzle = Marker3D.new()
-			muzzle.name = "Muzzle"
-			# Position it at the end of the gun barrel on the RightArm model
-			muzzle.position = Vector3(-0.5, 0.45, 1.2)
-			visual_barrel.add_child(muzzle)
+			push_warning("MechCockpit: Muzzle marker not found under RightArm — projectile spawn will be wrong.")
 
 func _input(event):
 	if is_dead: return
@@ -1196,7 +1174,6 @@ func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool):
 
 		if not is_enemy and not has_missed_shot:
 			has_missed_shot = true
-			_play_near_miss_sound(hit_pos)
 			var damage_number_script = preload("res://scripts/damage_number.gd")
 			damage_number_script.display_text(hit_pos, "MISS", get_tree().current_scene, Color.ORANGE_RED)
 		elif is_enemy:
@@ -1253,11 +1230,6 @@ func hit():
 ## How much to speed up time during the bullet's travel phase.
 @export var travel_fast_forward: float = 3.5
 
-func _play_near_miss_sound(miss_position: Vector3):
-	if miss_sound and _distance_to_nearest_enemy(miss_position) <= near_miss_sound_distance:
-		miss_sound.global_position = miss_position
-		miss_sound.play()
-
 func _distance_to_nearest_enemy(position: Vector3) -> float:
 	var nearest = INF
 	for node in get_tree().get_nodes_in_group("enemy"):
@@ -1282,6 +1254,8 @@ func _update_impact_side_camera(_delta: float) -> void:
 		if dist_to_camera_zone <= impact_side_camera_trigger_distance:
 			impact_side_camera_active = true
 			Engine.time_scale = impact_side_camera_time_scale
+			if side_cam_mortar_sound:
+				side_cam_mortar_sound.play()
 			_log_camera_switch("SIDE_CAM_ACTIVATED (dist=%.1fm)" % dist_to_camera_zone)
 		else:
 			Engine.time_scale = travel_fast_forward
@@ -1392,7 +1366,6 @@ func _resolve_missed_shot_at_target() -> void:
 	has_missed_shot = true
 	if combat_bark_ui:
 		combat_bark_ui.show_result(false)
-	_play_near_miss_sound(target_hit_point)
 	var damage_number_script = preload("res://scripts/damage_number.gd")
 	damage_number_script.display_text(target_hit_point, "MISS", get_tree().current_scene, Color.ORANGE_RED)
 	shot_resolved = true
@@ -1402,7 +1375,7 @@ func _fmt_debug_vec(value: Vector3) -> String:
 
 func _get_impact_resolve_linger_time() -> float:
 	if impact_side_camera_active:
-		return max(0.0, impact_side_camera_track_after_resolve_time)
+		return max(0.0, impact_side_camera_linger_duration)
 	return 0.05
 
 func _end_cinematic() -> void:

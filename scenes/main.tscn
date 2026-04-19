@@ -89,7 +89,7 @@ font_color = Color(0.5, 0.5, 0.5, 1)
 [node name="Main" type="Node3D" unique_id=2077343884]
 
 [node name="REF_Alpha" type="Marker3D" parent="." unique_id=1714902305]
-transform = Transform3D(0.9999958, -0.0026753985, 0.0010842613, 0.002667536, 0.99997056, 0.007197732, -0.001103496, -0.007194807, 0.9999735, 44.00413, 1.3188925, 119.10844)
+transform = Transform3D(0.9999958, -0.0026753985, 0.0010842613, 0.002667536, 0.99997056, 0.007197732, -0.001103496, -0.007194807, 0.9999735, 25.82161, 3.7908893, -8.732313)
 gizmo_extents = 0.5
 
 [node name="Dot" type="MeshInstance3D" parent="REF_Alpha" unique_id=1936452529]
@@ -133,8 +133,9 @@ script = ExtResource("2_script")
 firecam_duration = 0.2
 impact_side_camera_trigger_distance = 60.0
 impact_side_camera_time_scale = 0.6
-miss_timeout = 1.0
-analog_heartbeat_volume_db = 4.0
+camera_debug_enabled = false
+camera_debug_hud_enabled = false
+analog_heartbeat_volume_db = 5.0
 
 [node name="DirectionalSmoke" type="GPUParticles3D" parent="WIPtestmech/Armature" parent_id_path=PackedInt32Array(1679724251, 359783737) index="0" unique_id=641991123]
 transform = Transform3D(0.19957677, 0.7852611, -0.5861179, -0.96918815, 0.24632244, 0, 0.14437394, 0.5680583, 0.8102258, 0.7875495, 0.72992843, -0.87243533)
@@ -172,12 +173,16 @@ transform = Transform3D(0.19999991, -9.536732e-09, 1.6689295e-08, 3.979037e-15, 
 stream = ExtResource("9_sound")
 unit_size = 50.0
 
-[node name="GunCam_R" type="Camera3D" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm/RightArm" index="1" unique_id=1373230107]
+[node name="Muzzle" type="Marker3D" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm/RightArm" index="1" unique_id=39001305]
+transform = Transform3D(1, 1.4901161e-08, -5.9604645e-08, -1.4901161e-08, 0.9999996, 0, 0, 1.4901161e-08, 0.9999999, -0.58964443, 0.17575225, 1.4168054)
+gizmo_extents = 0.5
+
+[node name="GunCam_R" type="Camera3D" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm/RightArm" index="2" unique_id=1373230107]
 transform = Transform3D(-0.1939876, 0.021837179, 0.043496106, 0.006679024, 0.1889918, -0.06509551, -0.048209492, -0.06168607, -0.18403979, 0.053593636, 0.10975021, 0.84665203)
 near = 1.0
 far = 2000.0
 
-[node name="FireCam_R" type="Camera3D" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm/RightArm" index="2" unique_id=695871299]
+[node name="FireCam_R" type="Camera3D" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm/RightArm" index="3" unique_id=695871299]
 transform = Transform3D(-0.19939816, 0.014746653, 0.004783049, 0.012502842, 0.1894496, -0.06286859, -0.009166159, -0.06238042, -0.18980154, -0.68504477, -0.012366593, -0.45316386)
 fov = 68.0
 near = 1.0
@@ -220,6 +225,10 @@ unit_size = 50.0
 [node name="MissSound" type="AudioStreamPlayer3D" parent="WIPtestmech/Camera3D" unique_id=1754476414]
 stream = ExtResource("11_miss_sound")
 unit_size = 50.0
+
+[node name="SideCamMortarSound" type="AudioStreamPlayer" parent="WIPtestmech" unique_id=39001304]
+stream = ExtResource("11_miss_sound")
+volume_db = 3.0
 
 [node name="CanvasLayer" type="CanvasLayer" parent="WIPtestmech" unique_id=482160378]
 
