@@ -130,6 +130,19 @@ mesh = SubResource("SphereMesh_aim_target")
 [node name="WorldSetup" type="Node" parent="." unique_id=812988922]
 script = ExtResource("7_world_setup")
 
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1908299830 groups=["player_camera"]]
+transform = Transform3D(-0.79367214, 0.18570565, 0.5793083, 2.6686958e-08, 0.952268, -0.3052633, -0.6083458, -0.24227893, -0.75578856, 32.30565, 3.572755, -19.38382)
+current = true
+fov = 90.0
+
+[node name="HitSound" type="AudioStreamPlayer3D" parent="Camera3D" unique_id=1898408431]
+stream = ExtResource("10_hit_sound")
+unit_size = 50.0
+
+[node name="MissSound" type="AudioStreamPlayer3D" parent="Camera3D" unique_id=1754476414]
+stream = ExtResource("11_miss_sound")
+unit_size = 50.0
+
 [node name="WIPtestmech" parent="." unique_id=1679724251 instance=ExtResource("14_a8y0u")]
 transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 27.274748, 3.625, -13.861531)
 script = ExtResource("2_script")
@@ -215,18 +228,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 [node name="Shape" type="CollisionShape3D" parent="WIPtestmech/Collision" unique_id=738984214]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 shape = SubResource("BoxShape3D_leg")
-
-[node name="Camera3D" type="Camera3D" parent="WIPtestmech" unique_id=1908299830]
-transform = Transform3D(-0.2, 0, -1.7484556e-08, 0, 0.2, 0, 1.7484556e-08, 0, -0.2, 0.34367752, 1.1202359, -1.5891368)
-current = true
-
-[node name="HitSound" type="AudioStreamPlayer3D" parent="WIPtestmech/Camera3D" unique_id=1898408431]
-stream = ExtResource("10_hit_sound")
-unit_size = 50.0
-
-[node name="MissSound" type="AudioStreamPlayer3D" parent="WIPtestmech/Camera3D" unique_id=1754476414]
-stream = ExtResource("11_miss_sound")
-unit_size = 50.0
 
 [node name="SideCamMortarSound" type="AudioStreamPlayer" parent="WIPtestmech" unique_id=39001304]
 stream = ExtResource("11_miss_sound")
@@ -444,12 +445,20 @@ keep_aspect = 0
 v_offset = -8.205
 far = 2000.0
 
-[node name="SideCamLeft" type="Marker3D" parent="." unique_id=39001302]
+[node name="SideCamLeft" type="Marker3D" parent="." unique_id=39001302 groups=["side_cam_left"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.793173, 5, 127.393265)
 gizmo_extents = 2.0
 
-[node name="SideCamRight" type="Marker3D" parent="." unique_id=39001303]
+[node name="SideCamRight" type="Marker3D" parent="." unique_id=39001303 groups=["side_cam_right"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 47.358936, 5, 127.393265)
+gizmo_extents = 2.0
+
+[node name="PlayerSideCamLeft" type="Marker3D" parent="." groups=["player_side_cam_left"]]
+transform = Transform3D(0.85208867, 0, 0.52339745, 0.08758124, 0.98590057, -0.14258185, -0.51601785, 0.16733218, 0.84007471, 10.343033, 9.115548, 13.703224)
+gizmo_extents = 2.0
+
+[node name="PlayerSideCamRight" type="Marker3D" parent="." groups=["player_side_cam_right"]]
+transform = Transform3D(0.9090623, 0, -0.41666021, -0.07423893, 0.9839986, -0.16197326, 0.40999307, 0.1781762, 0.89451603, 39.908796, 9.115548, 13.703224)
 gizmo_extents = 2.0
 
 [node name="TestSoldier" parent="." unique_id=262171864 instance=ExtResource("19_gqmmt")]

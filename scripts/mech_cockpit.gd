@@ -1,6 +1,6 @@
 extends Node3D
 
-@onready var camera = $Camera3D
+var camera: Camera3D = null
 @onready var cockpit_mesh = self
 const PROJECTILE = preload("res://scenes/projectile.tscn")
 const DEFAULT_ANALOG_HEARTBEAT = preload("res://assets/Sounds/heartbeats-61.wav")
@@ -12,9 +12,7 @@ var armor: int = 3
 var is_dead: bool = false
 var damage_flash_timer: float = 0.0
 
-var target_rotation: Vector3 = Vector3.ZERO
 var mouse_sensitivity: float = 0.002
-var turret_speed: float = 3.0
 var sway_time: float = 0.0
 var base_sway_amount: float = 0.0015
 
@@ -26,13 +24,13 @@ var reload_duration: float = 2.5
 @onready var analog_reticle_hud = get_node_or_null("CanvasLayer/AnalogReticleHUD")
 @onready var combat_bark_ui = get_node_or_null("CanvasLayer/CombatBarkUI")
 @onready var cannon_sound = find_child("CannonSound", true)
-@onready var hit_sound = find_child("HitSound", true)
 @onready var side_cam_mortar_sound = find_child("SideCamMortarSound", true)
 
 var visual_barrel: Node3D
 
 @export var visual_barrel_node: Node3D # Assign in Inspector
 var muzzle: Node3D
+var hit_sound: AudioStreamPlayer3D = null
 
 # --- THE CINEMATIC DIRECTOR SETTINGS ---
 @export_group("Main Camera")
@@ -43,12 +41,17 @@ var muzzle: Node3D
 ## Maximum optical zoom out. Keep this below fisheye territory; extra wide view comes from camera pullback.
 @export var max_fov_limit: float = 82.0
 @export var zoom_sensitivity: float = 5.0
-## FOV where zoom-out starts physically pulling the camera back instead of widening the lens further.
-@export var zoom_dolly_start_fov: float = 75.0
-## Local camera offset applied at maximum zoom-out to avoid fishbowl distortion.
-@export var max_zoom_out_dolly_offset: Vector3 = Vector3(0.0, 0.0, -4.0)
-## How quickly the main camera physically settles into the zoom-out offset.
-@export var zoom_dolly_blend_speed: float = 10.0
+@export_group("Main Camera Orbit")
+## World-space offset from the mech origin that the normal-view camera orbits around.
+@export var main_camera_orbit_target_offset: Vector3 = Vector3(0.0, 1.35, 0.0)
+## Base orbit distance. Leave at 0 to derive it from the placed Camera3D.
+@export var main_camera_orbit_distance: float = 0.0
+## Lowest normal-view orbit pitch, in radians.
+@export var main_camera_min_pitch: float = deg_to_rad(-35.0)
+## Highest normal-view orbit pitch, in radians.
+@export var main_camera_max_pitch: float = deg_to_rad(55.0)
+## How quickly the camera settles onto its orbit position.
+@export var main_camera_orbit_blend_speed: float = 12.0
 
 @export_group("Gun Cam")
 ## FOV used during the gun-cam dolly-in transition.
@@ -173,7 +176,6 @@ var shot_will_hit_enemy: bool = false
 var shot_collision_debug_reported: bool = false
 var impact_side_camera_anchor: Node3D = null
 var impact_side_camera_active: bool = false
-var original_camera_rotation: Vector3
 var aim_settle: float = 0.09
 var hit_chance: float = 0.0
 var fire_recovery: float = 0.0
@@ -197,7 +199,8 @@ var aim_camera_session_target: Vector3 = Vector3.ZERO
 var aim_camera_chunk_stage: int = 0
 var analog_heartbeat_player: AudioStreamPlayer
 var target_dossier_ui: Control = null
-var main_camera_base_position: Vector3 = Vector3.ZERO
+var main_camera_orbit_yaw: float = 0.0
+var main_camera_orbit_pitch: float = 0.0
 
 # --- CAMERA DEBUG TRACKING ---
 var _debug_cam_last_switch_time: float = 0.0
@@ -321,15 +324,15 @@ func _ready():
 	analog_sway_rng.randomize()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
+	camera = _find_main_camera()
 	if camera:
-		main_camera_base_position = camera.position
+		_detach_main_camera_from_mech()
 		main_fov = clampf(main_fov, min_fov_limit, max_fov_limit)
+		_initialize_main_camera_orbit()
 		camera.make_current()
-		original_camera_rotation = camera.rotation
 		camera.fov = main_fov
+	hit_sound = _find_audio_player_3d("HitSound")
 	_set_analog_hud_visible(false)
-
-	target_rotation = rotation
 
 	call_deferred("_setup_big_gun")
 
@@ -447,10 +450,8 @@ func _input(event):
 			main_fov = clamp(main_fov + zoom_sensitivity, min_fov_limit, max_fov_limit)
 
 	if event is InputEventMouseMotion and combat_view_state == CombatViewState.NORMAL_VIEW and not is_reloading and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		target_rotation.y -= event.relative.x * mouse_sensitivity
-		target_rotation.x += event.relative.y * mouse_sensitivity
-		target_rotation.y = clamp(target_rotation.y, -0.4, 0.4)
-		target_rotation.x = clamp(target_rotation.x, -0.3, 0.3)
+		main_camera_orbit_yaw -= event.relative.x * mouse_sensitivity
+		main_camera_orbit_pitch = clampf(main_camera_orbit_pitch + event.relative.y * mouse_sensitivity, main_camera_min_pitch, main_camera_max_pitch)
 
 var current_target_range: float = 0.0
 var is_on_target: bool = false
@@ -458,6 +459,8 @@ var last_ray_result: Dictionary = {}
 
 func _process(delta):
 	if is_dead: return
+	if not is_instance_valid(camera):
+		_try_bind_main_camera()
 
 	if camera_debug_hud_enabled:
 		_update_debug_hud()
@@ -470,10 +473,6 @@ func _process(delta):
 		# Adjust delta to ignore slomo so zoom stays fast
 		var real_delta = delta / Engine.time_scale if Engine.time_scale > 0.001 else delta
 		camera.fov = lerpf(camera.fov, target_fov, blend_speed * real_delta)
-		var dolly_denominator = maxf(0.001, max_fov_limit - zoom_dolly_start_fov)
-		var dolly_alpha = clampf((target_fov - zoom_dolly_start_fov) / dolly_denominator, 0.0, 1.0)
-		var target_camera_position = main_camera_base_position + (max_zoom_out_dolly_offset * dolly_alpha)
-		camera.position = camera.position.lerp(target_camera_position, zoom_dolly_blend_speed * real_delta)
 
 	if damage_flash_timer > 0.0:
 		damage_flash_timer = max(0.0, damage_flash_timer - delta)
@@ -504,34 +503,29 @@ func _process(delta):
 	if cinematic_phase > 0:
 		_update_cinematic(delta)
 
+	if combat_view_state == CombatViewState.NORMAL_VIEW and not is_transitioning:
+		_update_main_camera_orbit(delta)
+
 	# --- Real-time Ranging ---
 	var aim_camera = _get_aim_query_camera()
-	var space_state = get_world_3d().direct_space_state
-	var query = PhysicsRayQueryParameters3D.new()
-	query.from = aim_camera.global_position
-	query.to = aim_camera.global_position + (-aim_camera.global_transform.basis.z * 1000.0)
-	last_ray_result = space_state.intersect_ray(query)
+	if aim_camera:
+		last_ray_result = _intersect_target_ray(aim_camera, 1000.0)
 
-	if last_ray_result:
-		current_target_range = aim_camera.global_position.distance_to(last_ray_result.position)
-		is_on_target = _is_enemy_collider(last_ray_result.collider)
+		if last_ray_result:
+			current_target_range = aim_camera.global_position.distance_to(last_ray_result.position)
+			is_on_target = _is_enemy_collider(last_ray_result.collider)
+		else:
+			current_target_range = 0.0
+			is_on_target = false
 	else:
+		last_ray_result = {}
 		current_target_range = 0.0
 		is_on_target = false
 
 	if combat_view_state == CombatViewState.ANALOG_AIM_VIEW:
 		_update_analog_aim(delta)
 
-	if combat_view_state == CombatViewState.NORMAL_VIEW:
-		rotation.y = lerpf(rotation.y, target_rotation.y, turret_speed * delta)
-		rotation.x = lerpf(rotation.x, target_rotation.x, turret_speed * delta)
-	else:
-		target_rotation = rotation
-
 	sway_time += delta
-	var current_sway = base_sway_amount + (current_spread * 0.05)
-	camera.rotation.x = original_camera_rotation.x + sin(sway_time * 0.8) * current_sway
-	camera.rotation.y = original_camera_rotation.y + cos(sway_time * 1.1) * current_sway
 	if combat_view_state == CombatViewState.GUN_CAM_VIEW and not is_transitioning:
 		_sync_plain_gun_camera()
 	elif combat_view_state == CombatViewState.ANALOG_AIM_VIEW and not is_transitioning:
@@ -545,7 +539,94 @@ func _process(delta):
 		fire_cannon()
 
 func _is_player_view_current() -> bool:
-	return camera.current or (cinematic_camera != null and cinematic_camera.current)
+	return (camera != null and camera.current) or (cinematic_camera != null and cinematic_camera.current)
+
+func _find_main_camera() -> Camera3D:
+	var child_camera := get_node_or_null("Camera3D") as Camera3D
+	if child_camera:
+		return child_camera
+	var grouped_camera := get_tree().get_first_node_in_group("player_camera") as Camera3D
+	if grouped_camera:
+		return grouped_camera
+	var current_scene := get_tree().current_scene
+	if current_scene:
+		var player_orbit_camera := current_scene.get_node_or_null("PlayerOrbitCamera") as Camera3D
+		if player_orbit_camera:
+			return player_orbit_camera
+		var root_camera := current_scene.get_node_or_null("Camera3D") as Camera3D
+		if root_camera:
+			return root_camera
+		player_orbit_camera = current_scene.find_child("PlayerOrbitCamera", true, false) as Camera3D
+		if player_orbit_camera:
+			return player_orbit_camera
+	return null
+
+func _try_bind_main_camera() -> void:
+	camera = _find_main_camera()
+	if not camera:
+		return
+	_detach_main_camera_from_mech()
+	_initialize_main_camera_orbit()
+	camera.fov = main_fov
+	hit_sound = _find_audio_player_3d("HitSound")
+
+func _find_audio_player_3d(node_name: String) -> AudioStreamPlayer3D:
+	var player := find_child(node_name, true, false) as AudioStreamPlayer3D
+	if player:
+		return player
+	if camera:
+		return camera.find_child(node_name, true, false) as AudioStreamPlayer3D
+	return null
+
+func _detach_main_camera_from_mech() -> void:
+	if not camera:
+		return
+	var scene_root := get_tree().current_scene
+	if not scene_root:
+		scene_root = get_tree().root
+	if camera.get_parent() == scene_root:
+		camera.add_to_group("player_camera")
+		return
+	var world_transform := camera.global_transform
+	var old_parent := camera.get_parent()
+	if old_parent:
+		old_parent.remove_child(camera)
+	scene_root.add_child(camera)
+	camera.top_level = false
+	camera.global_transform = world_transform
+	camera.add_to_group("player_camera")
+
+func _initialize_main_camera_orbit() -> void:
+	if not camera:
+		return
+	var target := global_position + main_camera_orbit_target_offset
+	var camera_offset := camera.global_position - target
+	var derived_distance := camera_offset.length()
+	if main_camera_orbit_distance <= 0.0:
+		main_camera_orbit_distance = maxf(0.1, derived_distance)
+	if derived_distance > 0.001:
+		main_camera_orbit_yaw = atan2(camera_offset.x, camera_offset.z)
+		main_camera_orbit_pitch = asin(clampf(camera_offset.y / derived_distance, -1.0, 1.0))
+	main_camera_orbit_pitch = clampf(main_camera_orbit_pitch, main_camera_min_pitch, main_camera_max_pitch)
+
+func _update_main_camera_orbit(delta: float) -> void:
+	if not camera:
+		return
+	var real_delta := delta / Engine.time_scale if Engine.time_scale > 0.001 else delta
+	var radius := maxf(0.1, main_camera_orbit_distance)
+	var target := global_position + main_camera_orbit_target_offset
+	var cos_pitch := cos(main_camera_orbit_pitch)
+	var orbit_offset := Vector3(
+		sin(main_camera_orbit_yaw) * cos_pitch * radius,
+		sin(main_camera_orbit_pitch) * radius,
+		cos(main_camera_orbit_yaw) * cos_pitch * radius
+	)
+	var blend := clampf(main_camera_orbit_blend_speed * real_delta, 0.0, 1.0)
+	camera.global_position = camera.global_position.lerp(target + orbit_offset, blend)
+	var current_sway := base_sway_amount + (current_spread * 0.05)
+	var sway_offset := camera.global_transform.basis.x * (sin(sway_time * 0.8) * current_sway * radius)
+	sway_offset += Vector3.UP * (cos(sway_time * 1.1) * current_sway * radius)
+	camera.look_at(target + sway_offset, Vector3.UP)
 
 func _update_analog_aim(delta: float) -> void:
 	var target_point = _get_analog_target_point()
@@ -601,6 +682,48 @@ func _set_analog_hud_visible(is_visible: bool) -> void:
 	if analog_reticle_hud:
 		analog_reticle_hud.visible = is_visible
 
+func _intersect_target_ray(source_camera: Camera3D, max_distance: float) -> Dictionary:
+	var space_state = get_world_3d().direct_space_state
+	var direction = -source_camera.global_transform.basis.z
+	var ray_from = source_camera.global_position
+	var ray_to = source_camera.global_position + (direction * max_distance)
+	var excluded: Array[RID] = []
+
+	for i in range(16):
+		if ray_from.distance_to(ray_to) < 0.01:
+			return {}
+		var query = PhysicsRayQueryParameters3D.create(ray_from, ray_to)
+		query.exclude = excluded
+		var result = space_state.intersect_ray(query)
+		if result.is_empty():
+			return {}
+		if _is_world_targeting_noise(result.collider):
+			if result.collider is CollisionObject3D:
+				excluded.append((result.collider as CollisionObject3D).get_rid())
+			ray_from = result.position + (direction * 0.08)
+			continue
+		if _is_enemy_collider(result.collider):
+			return result
+		return {}
+	return {}
+
+func _is_world_targeting_noise(collider: Object) -> bool:
+	if not collider or not collider is Node:
+		return false
+	var current = collider as Node
+	while current:
+		var node_name = current.name.to_lower()
+		if node_name == "worldsetup" or node_name == "environmentprops":
+			return true
+		if node_name == "mechscalegravelroad" or node_name == "grassblades":
+			return true
+		if node_name == "broadleaftree" or node_name == "pinetree" or node_name == "rock":
+			return true
+		if node_name == "mechscalebuilding":
+			return true
+		current = current.get_parent()
+	return false
+
 func _is_enemy_collider(collider: Object) -> bool:
 	if not collider:
 		return false
@@ -626,7 +749,7 @@ func _is_enemy_target_node(node: Node) -> bool:
 		return true
 	if "zezlan" in node_name:
 		return true
-	if "mech" in node_name:
+	if node_name == "enemymech":
 		return true
 	return false
 
@@ -678,11 +801,14 @@ func _update_analog_camera_presentation(delta: float) -> void:
 func _begin_aim_flow() -> void:
 	if is_reloading or is_transitioning or combat_view_state != CombatViewState.NORMAL_VIEW:
 		return
+	if not is_instance_valid(camera):
+		_try_bind_main_camera()
+	if not camera:
+		return
 	var gun_camera = _get_gun_camera_marker()
 	if not gun_camera:
 		return
 
-	target_rotation = rotation
 	is_transitioning = true
 	combat_view_state = CombatViewState.GUN_CAM_VIEW
 	_set_analog_hud_visible(false)
@@ -1160,18 +1286,14 @@ func _begin_fire_sequence_from_lock(shot_lock: Dictionary) -> void:
 	_perform_actual_shot(shot_lock["target_point"], shot_lock["will_hit_enemy"])
 
 func _build_shot_lock(source_camera: Camera3D) -> Dictionary:
-	var space_state = get_world_3d().direct_space_state
-	var query = PhysicsRayQueryParameters3D.new()
-	query.from = source_camera.global_position
 	var final_dir = -source_camera.global_transform.basis.z
-	query.to = source_camera.global_position + (final_dir * 500.0)
-	var result = space_state.intersect_ray(query)
+	var result = _intersect_target_ray(source_camera, 500.0)
 
 	var will_hit_enemy = false
 	var impact_anchor: Node3D = _get_analog_target_node()
 	var focal_range = current_target_range if current_target_range > 0 else 100.0
 	var focal_point = source_camera.global_position + (final_dir * focal_range)
-	var target_point = query.to
+	var target_point = source_camera.global_position + (final_dir * 500.0)
 	if result and result.collider:
 		target_point = result.position
 		if _is_enemy_collider(result.collider):
@@ -1469,7 +1591,8 @@ func _end_cinematic() -> void:
 	cinematic_phase = 0
 	Engine.time_scale = 1.0
 	cinematic_camera.current = false
-	camera.current = true
+	if camera:
+		camera.current = true
 	combat_view_state = CombatViewState.NORMAL_VIEW
 	_set_analog_hud_visible(false)
 	_stop_analog_heartbeat()

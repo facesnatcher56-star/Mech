@@ -60,8 +60,8 @@ func show_result(is_hit: bool, body_part_name: String = ""):
 func hide_bark():
 	_fade_out()
 
-func _normalize_part_name(name: String) -> String:
-	var n = name.to_lower()
+func _normalize_part_name(part_name: String) -> String:
+	var n = part_name.to_lower()
 	if "leftarm" in n: return "leftarm"
 	if "rightarm" in n: return "rightarm"
 	if "leftleg" in n: return "leftleg"

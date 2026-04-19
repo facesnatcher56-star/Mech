@@ -142,7 +142,11 @@ func _center_window(resolution: Vector2i) -> void:
 	var screen = DisplayServer.window_get_current_screen()
 	var screen_pos = DisplayServer.screen_get_position(screen)
 	var screen_size = DisplayServer.screen_get_size(screen)
-	DisplayServer.window_set_position(screen_pos + (screen_size - resolution) / 2)
+	var centered_offset := Vector2i(
+		roundi(float(screen_size.x - resolution.x) * 0.5),
+		roundi(float(screen_size.y - resolution.y) * 0.5)
+	)
+	DisplayServer.window_set_position(screen_pos + centered_offset)
 
 func _has_window_display() -> bool:
 	return DisplayServer.get_name() != "headless"

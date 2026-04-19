@@ -73,9 +73,15 @@ func _activate_camera() -> void:
 
 func _return_to_player_camera() -> void:
 	var player = get_tree().get_first_node_in_group("player")
-	if not player:
-		return
-	var player_camera = player.get_node_or_null("Camera3D") as Camera3D
+	var player_camera: Camera3D = null
+	if player:
+		player_camera = player.get_node_or_null("Camera3D") as Camera3D
+	if not player_camera:
+		player_camera = get_tree().get_first_node_in_group("player_camera") as Camera3D
+	if not player_camera and get_tree().current_scene:
+		player_camera = get_tree().current_scene.get_node_or_null("Camera3D") as Camera3D
+	if not player_camera and get_tree().current_scene:
+		player_camera = get_tree().current_scene.get_node_or_null("PlayerOrbitCamera") as Camera3D
 	if player_camera:
 		player_camera.make_current()
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
