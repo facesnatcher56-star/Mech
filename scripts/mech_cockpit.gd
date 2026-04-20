@@ -14,6 +14,7 @@ const ANALOG_TARGETING_CONTROLLER = preload("res://scripts/analog_targeting_cont
 const PLAYER_FIRE_CONTROLLER = preload("res://scripts/player_fire_controller.gd")
 const RELOAD_STATUS_CONTROLLER = preload("res://scripts/reload_status_controller.gd")
 const GROUND_ALIGNMENT_CONTROLLER = preload("res://scripts/ground_alignment_controller.gd")
+const PLAYER_HIT_RESPONSE_CONTROLLER = preload("res://scripts/player_hit_response_controller.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -199,6 +200,7 @@ var analog_targeting_controller: Node = null
 var player_fire_controller: Node = null
 var reload_status_controller: Node = null
 var ground_alignment_controller: Node = null
+var player_hit_response_controller: Node = null
 
 # --- RECOIL TRACKING ---
 
@@ -212,6 +214,7 @@ func _ready():
 	_setup_analog_aim_solution_controller()
 	_setup_reload_status_controller()
 	_setup_ground_alignment_controller()
+	_setup_player_hit_response_controller()
 	hit_sound = _find_audio_player_3d("HitSound")
 	_set_analog_hud_visible(false)
 
@@ -328,6 +331,28 @@ func _setup_ground_alignment_controller() -> void:
 		"body": self
 	})
 
+func _setup_player_hit_response_controller() -> void:
+	player_hit_response_controller = PLAYER_HIT_RESPONSE_CONTROLLER.new()
+	player_hit_response_controller.name = "PlayerHitResponseController"
+	add_child(player_hit_response_controller)
+	player_hit_response_controller.configure({
+		"cockpit": self,
+		"start_reload_callable": Callable(self, "_start_weapon_reload"),
+		"get_hp_snapshot_callable": Callable(self, "get_hp_snapshot"),
+		"player_damage_model": player_damage_model,
+		"projectile_cinematic_controller": projectile_cinematic_controller,
+		"dossier_presenter": dossier_presenter
+	})
+
+func _refresh_player_hit_response_controller() -> void:
+	if not player_hit_response_controller:
+		return
+	player_hit_response_controller.refresh_runtime_refs({
+		"player_damage_model": player_damage_model,
+		"projectile_cinematic_controller": projectile_cinematic_controller,
+		"dossier_presenter": dossier_presenter
+	})
+
 func _should_loop_analog_heartbeat() -> bool:
 	return combat_view_state == CombatViewState.ANALOG_AIM_VIEW
 
@@ -348,6 +373,7 @@ func _setup_dossier_presenter() -> void:
 	add_child(dossier_presenter)
 	dossier_presenter.configure(self, canvas_layer)
 	_refresh_player_fire_controller()
+	_refresh_player_hit_response_controller()
 
 func _setup_player_damage_model() -> void:
 	player_damage_model = PLAYER_DAMAGE_MODEL.new()
@@ -365,6 +391,7 @@ func _setup_player_damage_model() -> void:
 	player_damage_model.reset()
 	player_damage_model.destroyed.connect(_on_player_destroyed)
 	is_dead = player_damage_model.is_dead
+	_refresh_player_hit_response_controller()
 
 func _setup_main_camera_controller() -> void:
 	main_camera_controller = MAIN_CAMERA_CONTROLLER.new()
@@ -415,6 +442,7 @@ func _setup_projectile_cinematic_controller() -> void:
 		"side_camera_linger_duration": impact_side_camera_linger_duration,
 		"travel_fast_forward": travel_fast_forward
 	})
+	_refresh_player_hit_response_controller()
 
 func _setup_player_fire_controller() -> void:
 	player_fire_controller = PLAYER_FIRE_CONTROLLER.new()
@@ -972,46 +1000,12 @@ func _start_weapon_reload() -> void:
 		current_spread = max_spread
 
 func hit():
-	if is_dead:
-		return
-	if not player_damage_model or not player_damage_model.has_method("apply_hit"):
-		return
-
-	var damage_result: Dictionary = player_damage_model.apply_hit()
-	if not bool(damage_result.get("applied", false)):
-		is_dead = bool(damage_result.get("destroyed", is_dead))
-		return
-
-	is_dead = bool(damage_result.get("destroyed", false))
-	_start_weapon_reload()
-
-	if dossier_presenter and dossier_presenter.has_method("show_player_hit"):
-		dossier_presenter.show_player_hit(str(damage_result.get("part_key", "torso")), damage_result.get("snapshot", get_hp_snapshot()))
-
-	# If we take a hit during our outgoing cinematic, abort it
-	if projectile_cinematic_controller and projectile_cinematic_controller.has_method("is_active"):
-		if projectile_cinematic_controller.is_active():
-			projectile_cinematic_controller.end()
-
-	if camera:
-		for i in range(10):
-			var shake_tween = create_tween()
-			shake_tween.tween_property(camera, "h_offset", randf_range(-0.5, 0.5), 0.03)
-			shake_tween.tween_property(camera, "v_offset", randf_range(-0.5, 0.5), 0.03)
-		var reset_tween = create_tween()
-		reset_tween.tween_property(camera, "h_offset", 0.0, 0.05).set_delay(0.3)
-		reset_tween.tween_property(camera, "v_offset", 0.0, 0.05).set_delay(0.3)
-
-	if is_dead:
-		_play_player_death()
+	_refresh_player_hit_response_controller()
+	if player_hit_response_controller:
+		is_dead = player_hit_response_controller.apply_hit(camera, is_dead)
 
 func _on_player_destroyed(_snapshot: Dictionary) -> void:
 	is_dead = true
-
-func _play_player_death() -> void:
-	var death_tween = create_tween()
-	death_tween.tween_property(self, "rotation_degrees:z", 85.0, 2.0).set_trans(Tween.TRANS_SINE)
-	death_tween.tween_property(self, "position:y", -2.0, 2.0).set_parallel(true)
 
 ## How much to speed up time during the bullet's travel phase.
 @export var travel_fast_forward: float = 3.5
