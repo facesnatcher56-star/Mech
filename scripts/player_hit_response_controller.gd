@@ -1,17 +1,14 @@
 extends Node
 
+signal reload_started()
+
 var cockpit: Node3D = null
 var player_damage_model: Node = null
 var projectile_cinematic_controller: Node = null
 var dossier_presenter: Node = null
 
-var start_reload_callable: Callable
-var get_hp_snapshot_callable: Callable
-
 func configure(config: Dictionary) -> void:
 	cockpit = config.get("cockpit", cockpit)
-	start_reload_callable = config.get("start_reload_callable", Callable())
-	get_hp_snapshot_callable = config.get("get_hp_snapshot_callable", Callable())
 	refresh_runtime_refs(config)
 
 func refresh_runtime_refs(config: Dictionary) -> void:
@@ -41,19 +38,15 @@ func apply_hit(camera: Camera3D, current_is_dead: bool) -> bool:
 	return is_dead
 
 func _start_reload() -> void:
-	if start_reload_callable.is_valid():
-		start_reload_callable.call()
+	reload_started.emit()
 
 func _show_player_hit(damage_result: Dictionary) -> void:
 	if not dossier_presenter or not dossier_presenter.has_method("show_player_hit"):
 		return
-	var snapshot = _get_hp_snapshot()
-	dossier_presenter.show_player_hit(str(damage_result.get("part_key", "torso")), damage_result.get("snapshot", snapshot))
-
-func _get_hp_snapshot() -> Dictionary:
-	if get_hp_snapshot_callable.is_valid():
-		return get_hp_snapshot_callable.call()
-	return {}
+	var snapshot = damage_result.get("snapshot", {})
+	if snapshot.is_empty() and player_damage_model and player_damage_model.has_method("get_hp_snapshot"):
+		snapshot = player_damage_model.get_hp_snapshot()
+	dossier_presenter.show_player_hit(str(damage_result.get("part_key", "torso")), snapshot)
 
 func _abort_outgoing_cinematic() -> void:
 	if projectile_cinematic_controller and projectile_cinematic_controller.has_method("is_active"):

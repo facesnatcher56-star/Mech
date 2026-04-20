@@ -1,12 +1,13 @@
 extends Node
 
+signal shot_missed(hit_pos: Vector3)
+signal cinematic_ended()
+
 var cockpit: Node3D = null
 var cinematic_camera: Camera3D = null
 var player_camera: Camera3D = null
 var side_cam_mortar_sound: AudioStreamPlayer = null
-var get_anchor_callable: Callable
-var on_miss_callable: Callable
-var on_end_callable: Callable
+var analog_targeting_controller: Node = null
 
 var firecam_duration: float = 0.5
 var firecam_fov: float = 75.0
@@ -38,9 +39,7 @@ func configure(config: Dictionary) -> void:
 	cinematic_camera = config.get("cinematic_camera", null) as Camera3D
 	player_camera = config.get("player_camera", null) as Camera3D
 	side_cam_mortar_sound = config.get("side_cam_mortar_sound", null) as AudioStreamPlayer
-	get_anchor_callable = config.get("get_anchor_callable", Callable())
-	on_miss_callable = config.get("on_miss_callable", Callable())
-	on_end_callable = config.get("on_end_callable", Callable())
+	analog_targeting_controller = config.get("analog_targeting_controller", analog_targeting_controller)
 	firecam_duration = float(config.get("firecam_duration", firecam_duration))
 	firecam_fov = float(config.get("firecam_fov", firecam_fov))
 	side_cam_left_group = str(config.get("side_cam_left_group", side_cam_left_group))
@@ -101,8 +100,7 @@ func end() -> void:
 	if player_camera:
 		player_camera.current = true
 	active_shell = null
-	if on_end_callable.is_valid():
-		on_end_callable.call()
+	cinematic_ended.emit()
 
 func update(delta: float) -> void:
 	timer += delta
@@ -214,8 +212,8 @@ func _get_side_camera_world_position() -> Vector3:
 func _get_side_camera_anchor() -> Node3D:
 	if side_camera_anchor and is_instance_valid(side_camera_anchor):
 		return side_camera_anchor
-	if get_anchor_callable.is_valid():
-		side_camera_anchor = get_anchor_callable.call() as Node3D
+	if analog_targeting_controller and analog_targeting_controller.has_method("get_target_node"):
+		side_camera_anchor = analog_targeting_controller.get_target_node() as Node3D
 		if side_camera_anchor:
 			return side_camera_anchor
 	var current_scene = get_tree().current_scene
@@ -238,8 +236,7 @@ func _resolve_missed_shot_at_target() -> void:
 		shot_resolved = true
 		return
 	has_missed_shot = true
-	if on_miss_callable.is_valid():
-		on_miss_callable.call(target_hit_point)
+	shot_missed.emit(target_hit_point)
 	shot_resolved = true
 
 func _get_linger_time() -> float:

@@ -12,29 +12,22 @@ var hit_sound: AudioStreamPlayer3D = null
 var visual_barrel: Node3D = null
 var muzzle: Node3D = null
 
+signal reload_started()
+
 var projectile_speed: float = 150.0
 var bullet_slomo: float = 0.2
 
-var intersect_target_ray_callable: Callable
-var is_enemy_collider_callable: Callable
-var get_target_node_callable: Callable
-var get_enemy_aim_root_callable: Callable
-var apply_enemy_damage_callable: Callable
-var get_fire_camera_callable: Callable
-var on_reload_started_callable: Callable
+var target_query_helper: Node = null
+var analog_targeting_controller: Node = null
+var fire_cam: Camera3D = null
 
 var recoil_tween: Tween
 var visual_barrel_base_pos: Vector3
 
 func configure(config: Dictionary) -> void:
 	cockpit = config.get("cockpit", cockpit)
-	intersect_target_ray_callable = config.get("intersect_target_ray_callable", Callable())
-	is_enemy_collider_callable = config.get("is_enemy_collider_callable", Callable())
-	get_target_node_callable = config.get("get_target_node_callable", Callable())
-	get_enemy_aim_root_callable = config.get("get_enemy_aim_root_callable", Callable())
-	apply_enemy_damage_callable = config.get("apply_enemy_damage_callable", Callable())
-	get_fire_camera_callable = config.get("get_fire_camera_callable", Callable())
-	on_reload_started_callable = config.get("on_reload_started_callable", Callable())
+	target_query_helper = config.get("target_query_helper", target_query_helper)
+	analog_targeting_controller = config.get("analog_targeting_controller", analog_targeting_controller)
 	refresh_runtime_refs(config)
 
 func refresh_runtime_refs(config: Dictionary) -> void:
@@ -45,6 +38,7 @@ func refresh_runtime_refs(config: Dictionary) -> void:
 	hit_sound = config.get("hit_sound", hit_sound)
 	visual_barrel = config.get("visual_barrel", visual_barrel)
 	muzzle = config.get("muzzle", muzzle)
+	fire_cam = config.get("fire_cam", fire_cam) as Camera3D
 	projectile_speed = float(config.get("projectile_speed", projectile_speed))
 	bullet_slomo = float(config.get("bullet_slomo", bullet_slomo))
 
@@ -90,8 +84,7 @@ func perform_actual_shot(target_point: Vector3, will_hit_enemy: bool, focal_poin
 		if dir_smoke and dir_smoke.has_method("fire"):
 			dir_smoke.fire()
 
-	if on_reload_started_callable.is_valid():
-		on_reload_started_callable.call()
+	reload_started.emit()
 
 	var fire_camera = _get_fire_camera()
 	if projectile_cinematic_controller and projectile_cinematic_controller.has_method("begin_fire_cam") and muzzle:
@@ -161,31 +154,29 @@ func _apply_recoil() -> void:
 	recoil_tween.tween_property(visual_barrel, "position", visual_barrel_base_pos, 0.18).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 
 func _intersect_target_ray(source_camera: Camera3D, max_distance: float) -> Dictionary:
-	if intersect_target_ray_callable.is_valid():
-		return intersect_target_ray_callable.call(source_camera, max_distance)
+	if target_query_helper:
+		return target_query_helper.intersect_target_ray(source_camera, max_distance)
 	return {}
 
 func _is_enemy_collider(collider: Object) -> bool:
-	if is_enemy_collider_callable.is_valid():
-		return bool(is_enemy_collider_callable.call(collider))
+	if target_query_helper:
+		return target_query_helper.is_enemy_collider(collider)
 	return false
 
 func _get_target_node() -> Node3D:
-	if get_target_node_callable.is_valid():
-		return get_target_node_callable.call()
+	if analog_targeting_controller:
+		return analog_targeting_controller.get_target_node()
 	return null
 
 func _get_enemy_aim_root(node: Node3D) -> Node3D:
-	if get_enemy_aim_root_callable.is_valid():
-		return get_enemy_aim_root_callable.call(node)
+	if analog_targeting_controller:
+		return analog_targeting_controller.get_enemy_aim_root(node)
 	return node
 
 func _apply_enemy_damage(body: Node, hit_pos: Vector3) -> Dictionary:
-	if apply_enemy_damage_callable.is_valid():
-		return apply_enemy_damage_callable.call(body, hit_pos)
+	if dossier_presenter and dossier_presenter.has_method("apply_enemy_damage"):
+		return dossier_presenter.apply_enemy_damage(body, hit_pos)
 	return {}
 
 func _get_fire_camera() -> Camera3D:
-	if get_fire_camera_callable.is_valid():
-		return get_fire_camera_callable.call()
-	return null
+	return fire_cam

@@ -372,12 +372,11 @@ func _setup_player_hit_response_controller() -> void:
 	add_child(player_hit_response_controller)
 	player_hit_response_controller.configure({
 		"cockpit": self,
-		"start_reload_callable": Callable(self, "_start_weapon_reload"),
-		"get_hp_snapshot_callable": Callable(self, "get_hp_snapshot"),
 		"player_damage_model": player_damage_model,
 		"projectile_cinematic_controller": projectile_cinematic_controller,
 		"dossier_presenter": dossier_presenter
 	})
+	player_hit_response_controller.reload_started.connect(_start_weapon_reload)
 
 func _refresh_player_hit_response_controller() -> void:
 	if not player_hit_response_controller:
@@ -475,9 +474,7 @@ func _setup_projectile_cinematic_controller() -> void:
 		"cinematic_camera": cinematic_camera,
 		"player_camera": camera,
 		"side_cam_mortar_sound": side_cam_mortar_sound,
-		"get_anchor_callable": Callable(self, "_get_analog_target_node"),
-		"on_miss_callable": Callable(self, "_on_projectile_cinematic_miss"),
-		"on_end_callable": Callable(self, "_on_projectile_cinematic_end"),
+		"analog_targeting_controller": analog_targeting_controller,
 		"firecam_duration": firecam_duration,
 		"firecam_fov": firecam_fov,
 		"side_cam_left_group": impact_side_cam_left_group,
@@ -492,6 +489,8 @@ func _setup_projectile_cinematic_controller() -> void:
 		"side_camera_linger_duration": impact_side_camera_linger_duration,
 		"travel_fast_forward": travel_fast_forward
 	})
+	projectile_cinematic_controller.shot_missed.connect(_on_projectile_cinematic_miss)
+	projectile_cinematic_controller.cinematic_ended.connect(_on_projectile_cinematic_end)
 	_refresh_player_hit_response_controller()
 
 func _setup_player_fire_controller() -> void:
@@ -500,13 +499,8 @@ func _setup_player_fire_controller() -> void:
 	add_child(player_fire_controller)
 	player_fire_controller.configure({
 		"cockpit": self,
-		"intersect_target_ray_callable": Callable(self, "_intersect_target_ray"),
-		"is_enemy_collider_callable": Callable(self, "_is_enemy_collider"),
-		"get_target_node_callable": Callable(self, "_get_analog_target_node"),
-		"get_enemy_aim_root_callable": Callable(self, "_get_enemy_aim_root"),
-		"apply_enemy_damage_callable": Callable(self, "_apply_enemy_damage"),
-		"get_fire_camera_callable": Callable(self, "_get_fire_camera_marker"),
-		"on_reload_started_callable": Callable(self, "_start_weapon_reload"),
+		"target_query_helper": target_query_helper,
+		"analog_targeting_controller": analog_targeting_controller,
 		"projectile_cinematic_controller": projectile_cinematic_controller,
 		"combat_bark_ui": combat_bark_ui,
 		"dossier_presenter": dossier_presenter,
@@ -514,9 +508,11 @@ func _setup_player_fire_controller() -> void:
 		"hit_sound": hit_sound,
 		"visual_barrel": visual_barrel,
 		"muzzle": muzzle,
+		"fire_cam": find_child("FireCam_R", true) as Camera3D,
 		"projectile_speed": projectile_speed,
 		"bullet_slomo": bullet_slomo
 	})
+	player_fire_controller.reload_started.connect(_start_weapon_reload)
 
 func _refresh_player_fire_controller() -> void:
 	if not player_fire_controller:
@@ -529,6 +525,7 @@ func _refresh_player_fire_controller() -> void:
 		"hit_sound": hit_sound,
 		"visual_barrel": visual_barrel,
 		"muzzle": muzzle,
+		"fire_cam": find_child("FireCam_R", true) as Camera3D,
 		"projectile_speed": projectile_speed,
 		"bullet_slomo": bullet_slomo
 	})
