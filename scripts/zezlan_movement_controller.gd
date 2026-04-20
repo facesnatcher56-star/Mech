@@ -320,6 +320,9 @@ func _launch_shell(player: Node3D) -> void:
 	shell.global_position = muzzle_pos
 	shell.look_at(aim_pos, Vector3.UP)
 
+	if player.has_method("set_enemy_active_shell"):
+		player.set_enemy_active_shell(shell, aim_pos)
+
 
 func _get_muzzle_position() -> Vector3:
 	var muzzle := find_child("EnemyMuzzle", true, false) as Node3D

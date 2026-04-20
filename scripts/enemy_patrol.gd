@@ -86,6 +86,9 @@ func _perform_fire():
 	shell.global_position = muzzle_pos
 	shell.look_at(aim_pos, Vector3.UP)
 
+	if player.has_method("set_enemy_active_shell"):
+		player.set_enemy_active_shell(shell, aim_pos)
+
 func hit():
 	# The individual parts will handle their own hits via the projectile
 	pass

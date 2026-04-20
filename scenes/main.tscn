@@ -568,6 +568,12 @@ transform = Transform3D(-4.371139e-08, -0.06975651, 0.9975641, 0, 0.9975641, 0.0
 [node name="Muzzle" type="Marker3D" parent="TestSoldier/RPGTube" unique_id=1897734595]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.58, 0)
 
+[node name="ActionCamA" type="Camera3D" parent="." unique_id=3000013]
+transform = Transform3D(0.6624632, 0, -0.7490945, 0, 1, 0, 0.7490945, 0, 0.6624632, 22.366245, 5, -4.323038)
+
+[node name="ActionCamB" type="Camera3D" parent="." unique_id=3000014]
+transform = Transform3D(0.9448918, 0, 0.32738283, 0, 1, 0, -0.32738283, 0, 0.9448918, 33.959053, 5, -5.70838)
+
 [editable path="WIPtestmech"]
 [editable path="zezlan"]
 [editable path="TestSoldier"]

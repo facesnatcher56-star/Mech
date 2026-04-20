@@ -469,7 +469,8 @@ func _setup_main_camera_controller() -> void:
 func _setup_enemy_fire_cinematic_controller() -> void:
 	enemy_fire_cinematic_controller = ENEMY_FIRE_CINEMATIC_CONTROLLER.new()
 	enemy_fire_cinematic_controller.name = "EnemyFireCinematicController"
-	add_child(enemy_fire_cinematic_controller)
+	var root = get_tree().root.get_child(0)
+	root.add_child.call_deferred(enemy_fire_cinematic_controller)
 
 func _setup_projectile_cinematic_controller() -> void:
 	projectile_cinematic_controller = PROJECTILE_CINEMATIC_CONTROLLER.new()
@@ -627,6 +628,10 @@ func _process(delta):
 		if projectile_cinematic_controller.is_active():
 			projectile_cinematic_controller.update(delta)
 
+	if enemy_fire_cinematic_controller and enemy_fire_cinematic_controller.has_method("is_active"):
+		if enemy_fire_cinematic_controller.is_active():
+			enemy_fire_cinematic_controller.update(delta)
+
 	if combat_view_state == CombatViewState.NORMAL_VIEW and not is_transitioning:
 		if main_camera_controller and main_camera_controller.has_method("update_orbit"):
 			main_camera_controller.update_orbit(delta, sway_time, base_sway_amount, current_spread)
@@ -761,6 +766,10 @@ func begin_enemy_fire_cinematic(fire_callable: Callable) -> void:
 		enemy_fire_cinematic_controller.begin(fire_callable, camera, cinematic_camera, is_dead, Callable(self, "_end_cinematic_if_active"))
 	else:
 		fire_callable.call()
+
+func set_enemy_active_shell(shell: Node3D, impact_pos: Vector3) -> void:
+	if enemy_fire_cinematic_controller and enemy_fire_cinematic_controller.has_method("set_active_shell"):
+		enemy_fire_cinematic_controller.set_active_shell(shell, impact_pos)
 
 func _end_cinematic_if_active() -> void:
 	if projectile_cinematic_controller and projectile_cinematic_controller.has_method("is_active"):
