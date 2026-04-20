@@ -12,6 +12,7 @@ const PROJECTILE_CINEMATIC_CONTROLLER = preload("res://scripts/projectile_cinema
 const ANALOG_AIM_SOLUTION_CONTROLLER = preload("res://scripts/analog_aim_solution_controller.gd")
 const ANALOG_TARGETING_CONTROLLER = preload("res://scripts/analog_targeting_controller.gd")
 const PLAYER_FIRE_CONTROLLER = preload("res://scripts/player_fire_controller.gd")
+const RELOAD_STATUS_CONTROLLER = preload("res://scripts/reload_status_controller.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -195,6 +196,7 @@ var projectile_cinematic_controller: Node = null
 var analog_aim_solution_controller: Node = null
 var analog_targeting_controller: Node = null
 var player_fire_controller: Node = null
+var reload_status_controller: Node = null
 
 # --- RECOIL TRACKING ---
 
@@ -206,6 +208,7 @@ func _ready():
 	_setup_main_camera_controller()
 	_setup_enemy_fire_cinematic_controller()
 	_setup_analog_aim_solution_controller()
+	_setup_reload_status_controller()
 	hit_sound = _find_audio_player_3d("HitSound")
 	_set_analog_hud_visible(false)
 
@@ -300,6 +303,18 @@ func _setup_analog_targeting_controller() -> void:
 		"high_accuracy_stroke_duration": analog_high_accuracy_stroke_duration,
 		"max_distance_from_frame": analog_max_distance_from_frame,
 		"visible_frame_min_padding": analog_visible_frame_min_padding
+	})
+
+func _setup_reload_status_controller() -> void:
+	reload_status_controller = RELOAD_STATUS_CONTROLLER.new()
+	reload_status_controller.name = "ReloadStatusController"
+	add_child(reload_status_controller)
+	reload_status_controller.configure({
+		"max_spread": max_spread,
+		"reload_duration": reload_duration,
+		"current_spread": current_spread,
+		"is_reloading": is_reloading,
+		"reload_timer": reload_timer
 	})
 
 func _should_loop_analog_heartbeat() -> bool:
@@ -513,17 +528,7 @@ func _process(delta):
 	else:
 		global_position.y = lerpf(global_position.y, 3.625, delta * 5.0)
 
-	var reload_progress = 0.0
-
-	if is_reloading:
-		reload_timer += delta
-		current_spread = max_spread
-		reload_progress = 1.0 - (reload_timer / reload_duration)
-		if reload_timer >= reload_duration:
-			is_reloading = false
-	else:
-		reload_progress = 1.0
-		current_spread = lerpf(current_spread, 0.0, delta * 0.5)
+	var reload_progress = _update_reload_status(delta)
 
 	# Push player reload into self dossier every frame
 	if dossier_presenter and dossier_presenter.has_method("update_self_status"):
@@ -854,6 +859,15 @@ func _get_drifted_analog_target_point(target_point: Vector3, delta: float) -> Ve
 func _is_unit_stable() -> bool:
 	return not is_reloading
 
+func _update_reload_status(delta: float) -> float:
+	if not reload_status_controller:
+		return 1.0
+	var state = reload_status_controller.update(delta)
+	is_reloading = bool(state["is_reloading"])
+	reload_timer = float(state["reload_timer"])
+	current_spread = float(state["current_spread"])
+	return float(state["reload_progress"])
+
 func _disrupt_aim_after_fire() -> void:
 	if not analog_aim_solution_controller:
 		return
@@ -944,9 +958,16 @@ func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool, focal_poi
 		player_fire_controller.perform_actual_shot(target_point, will_hit_enemy, focal_point, impact_anchor)
 
 func _start_weapon_reload() -> void:
-	is_reloading = true
-	reload_timer = 0.0
-	current_spread = max_spread
+	if reload_status_controller:
+		reload_status_controller.start_reload()
+		var state = reload_status_controller.get_state()
+		is_reloading = bool(state["is_reloading"])
+		reload_timer = float(state["reload_timer"])
+		current_spread = float(state["current_spread"])
+	else:
+		is_reloading = true
+		reload_timer = 0.0
+		current_spread = max_spread
 
 func hit():
 	if is_dead:
@@ -960,8 +981,7 @@ func hit():
 		return
 
 	is_dead = bool(damage_result.get("destroyed", false))
-	is_reloading = true
-	reload_timer = 0.0
+	_start_weapon_reload()
 
 	if dossier_presenter and dossier_presenter.has_method("show_player_hit"):
 		dossier_presenter.show_player_hit(str(damage_result.get("part_key", "torso")), damage_result.get("snapshot", get_hp_snapshot()))
