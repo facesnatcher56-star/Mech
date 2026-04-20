@@ -4,7 +4,7 @@ const PROJECTILE = preload("res://scenes/projectile.tscn")
 
 @export_group("Zezlan Firing")
 ## Seconds between each shot fired at the player.
-@export var fire_interval: float = 6.0
+@export var fire_interval: float = 12.0
 ## Delay before the very first shot.
 @export var initial_fire_delay: float = 4.0
 ## Shell travel speed in world units per second.
@@ -282,18 +282,27 @@ func _process(delta: float) -> void:
 	_update_animation(delta)
 	_update_fire_timer(delta)
 
-func _update_fire_timer(delta: float) -> void:
-	if is_destroyed:
-		return
-	_fire_timer -= delta
-	if _fire_timer <= 0.0:
-		_fire_timer = fire_interval
-		_fire_at_player()
+func _update_fire_timer(_delta: float) -> void:
+	pass  # firing disabled
 
 func _fire_at_player() -> void:
 	var player := get_tree().get_first_node_in_group("player") as Node3D
 	if not is_instance_valid(player):
 		return
+
+	if player.has_method("begin_enemy_fire_cinematic"):
+		player.begin_enemy_fire_cinematic(func(): _launch_shell(player))
+	else:
+		_launch_shell(player)
+
+func _launch_shell(player: Node3D) -> void:
+	if not is_instance_valid(player):
+		return
+
+	var fire_player := get_node_or_null("ZezlanFirePlayer") as AnimationPlayer
+	if fire_player and fire_player.has_animation(&"Fire"):
+		fire_player.stop()
+		fire_player.play(&"Fire")
 
 	var muzzle_pos := _get_muzzle_position()
 	var aim_pos    := player.global_position + Vector3.UP * aim_height_offset
@@ -378,7 +387,9 @@ func _get_travel_direction() -> Vector3:
 
 func _find_animation_player(node: Node) -> AnimationPlayer:
 	if node is AnimationPlayer:
-		return node as AnimationPlayer
+		var ap := node as AnimationPlayer
+		if ap.has_animation(walk_animation_name):
+			return ap
 	for child in node.get_children():
 		var found := _find_animation_player(child)
 		if found:

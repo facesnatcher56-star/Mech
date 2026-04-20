@@ -216,6 +216,7 @@ var analog_heartbeat_player: AudioStreamPlayer
 var target_dossier_ui: Control = null
 var self_dossier_ui: Control = null
 var enemy_status_ui: Control = null
+var enemy_fire_cinematic_active: bool = false
 var structure_hp: int = 0
 var torso_hp: int = 0
 var left_arm_hp: int = 0
@@ -888,6 +889,41 @@ func _update_analog_camera_presentation(delta: float) -> void:
 		var drifted_point = _get_drifted_analog_target_point(target_point, delta)
 		cinematic_camera.look_at(drifted_point, Vector3.UP)
 
+func begin_enemy_fire_cinematic(fire_callable: Callable) -> void:
+	if is_dead:
+		fire_callable.call()
+		return
+
+	var enemy_cam := _find_scene_camera("FiringSequenceCam")
+	if not enemy_cam:
+		fire_callable.call()
+		return
+
+	enemy_fire_cinematic_active = true
+	if cinematic_phase > 0:
+		_end_cinematic()
+
+	if camera:
+		camera.current = false
+	cinematic_camera.current = false
+	enemy_cam.current = true
+
+	get_tree().create_timer(2.0).timeout.connect(func():
+		fire_callable.call()
+		get_tree().create_timer(2.0).timeout.connect(func():
+			enemy_cam.current = false
+			if camera:
+				camera.current = true
+			enemy_fire_cinematic_active = false
+		)
+	)
+
+func _find_scene_camera(cam_name: String) -> Camera3D:
+	var scene := get_tree().current_scene
+	if scene:
+		return scene.get_node_or_null(cam_name) as Camera3D
+	return null
+
 func _begin_aim_flow() -> void:
 	if is_reloading or is_transitioning or combat_view_state != CombatViewState.NORMAL_VIEW:
 		return
@@ -1322,7 +1358,7 @@ func _disrupt_aim_after_fire() -> void:
 var is_transitioning: bool = false
 
 func fire_cannon():
-	if is_reloading or is_transitioning:
+	if is_reloading or is_transitioning or enemy_fire_cinematic_active:
 		return
 
 	if combat_view_state == CombatViewState.NORMAL_VIEW:
