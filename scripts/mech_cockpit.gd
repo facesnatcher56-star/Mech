@@ -13,6 +13,7 @@ const ANALOG_AIM_SOLUTION_CONTROLLER = preload("res://scripts/analog_aim_solutio
 const ANALOG_TARGETING_CONTROLLER = preload("res://scripts/analog_targeting_controller.gd")
 const PLAYER_FIRE_CONTROLLER = preload("res://scripts/player_fire_controller.gd")
 const RELOAD_STATUS_CONTROLLER = preload("res://scripts/reload_status_controller.gd")
+const GROUND_ALIGNMENT_CONTROLLER = preload("res://scripts/ground_alignment_controller.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -197,6 +198,7 @@ var analog_aim_solution_controller: Node = null
 var analog_targeting_controller: Node = null
 var player_fire_controller: Node = null
 var reload_status_controller: Node = null
+var ground_alignment_controller: Node = null
 
 # --- RECOIL TRACKING ---
 
@@ -209,6 +211,7 @@ func _ready():
 	_setup_enemy_fire_cinematic_controller()
 	_setup_analog_aim_solution_controller()
 	_setup_reload_status_controller()
+	_setup_ground_alignment_controller()
 	hit_sound = _find_audio_player_3d("HitSound")
 	_set_analog_hud_visible(false)
 
@@ -315,6 +318,14 @@ func _setup_reload_status_controller() -> void:
 		"current_spread": current_spread,
 		"is_reloading": is_reloading,
 		"reload_timer": reload_timer
+	})
+
+func _setup_ground_alignment_controller() -> void:
+	ground_alignment_controller = GROUND_ALIGNMENT_CONTROLLER.new()
+	ground_alignment_controller.name = "GroundAlignmentController"
+	add_child(ground_alignment_controller)
+	ground_alignment_controller.configure({
+		"body": self
 	})
 
 func _should_loop_analog_heartbeat() -> bool:
@@ -516,17 +527,8 @@ func _process(delta):
 		player_damage_model.update(delta)
 		is_dead = player_damage_model.is_dead
 
-	# --- Ground Alignment (Stationary) ---
-	var ss_ground = get_world_3d().direct_space_state
-	var ground_query = PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 2.0, global_position + Vector3.DOWN * 5.0)
-	# Fix: Exclude self and all children from the ground check to prevent snapping to own hitbox
-	ground_query.exclude = _get_sweep_exclusions()
-	
-	var ground_res = ss_ground.intersect_ray(ground_query)
-	if ground_res:
-		global_position.y = lerpf(global_position.y, ground_res.position.y + 3.625, delta * 5.0)
-	else:
-		global_position.y = lerpf(global_position.y, 3.625, delta * 5.0)
+	if ground_alignment_controller:
+		ground_alignment_controller.update(delta)
 
 	var reload_progress = _update_reload_status(delta)
 
@@ -1022,15 +1024,9 @@ func _distance_to_nearest_enemy(position: Vector3) -> float:
 	return nearest
 
 func _get_sweep_exclusions() -> Array[RID]:
-	var exclusions: Array[RID] = []
-	_collect_collision_object_rids(self, exclusions)
-	return exclusions
-
-func _collect_collision_object_rids(node: Node, exclusions: Array[RID]) -> void:
-	if node is CollisionObject3D:
-		exclusions.append((node as CollisionObject3D).get_rid())
-	for child in node.get_children():
-		_collect_collision_object_rids(child, exclusions)
+	if ground_alignment_controller:
+		return ground_alignment_controller.get_sweep_exclusions()
+	return []
 
 func _on_projectile_cinematic_miss(hit_pos: Vector3) -> void:
 	if combat_bark_ui:
