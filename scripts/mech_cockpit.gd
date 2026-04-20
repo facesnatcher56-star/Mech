@@ -185,8 +185,6 @@ var hit_sound: AudioStreamPlayer3D = null
 @export var analog_heartbeat_pitch_scale: float = 1.0
 
 var cinematic_camera: Camera3D
-var current_analog_drift_multiplier: float = 1.0
-var combat_view_state: int = CombatViewState.NORMAL_VIEW
 var player_damage_model: Node = null
 var dossier_presenter: Node = null
 var main_camera_controller: Node = null
@@ -228,6 +226,7 @@ func _ready():
 	_setup_projectile_cinematic_controller()
 	_setup_player_fire_controller()
 	call_deferred("_setup_dossier_presenter")
+	call_deferred("_finalize_combat_view_flow_refs")
 
 func _setup_analog_heartbeat_controller() -> void:
 	analog_heartbeat_controller = ANALOG_HEARTBEAT_CONTROLLER.new()
@@ -344,27 +343,27 @@ func _setup_combat_view_flow_controller() -> void:
 	combat_view_flow_controller = COMBAT_VIEW_FLOW_CONTROLLER.new()
 	combat_view_flow_controller.name = "CombatViewFlowController"
 	add_child(combat_view_flow_controller)
-	combat_view_flow_controller.configure({
-		"cockpit": self,
-		"combat_view_state": combat_view_state,
-		"is_transitioning": is_transitioning,
-		"current_analog_drift_multiplier": current_analog_drift_multiplier,
-		"get_gun_camera_callable": Callable(self, "_get_gun_camera_marker"),
-		"get_fire_camera_callable": Callable(self, "_get_fire_camera_marker"),
-		"get_analog_target_point_callable": Callable(self, "_get_analog_target_point"),
-		"get_analog_camera_target_point_callable": Callable(self, "_get_analog_camera_target_point"),
-		"get_drifted_analog_target_point_callable": Callable(self, "_get_drifted_analog_target_point"),
-		"set_analog_hud_visible_callable": Callable(self, "_set_analog_hud_visible"),
-		"play_analog_heartbeat_callable": Callable(self, "_play_analog_heartbeat"),
-		"stop_analog_heartbeat_callable": Callable(self, "_stop_analog_heartbeat"),
-		"show_target_dossier_callable": Callable(self, "_show_target_dossier"),
-		"hide_target_dossier_callable": Callable(self, "_hide_target_dossier"),
-		"reset_aim_solution_callable": Callable(self, "_reset_analog_aim_solution"),
-		"reset_targeting_stroke_callable": Callable(self, "_reset_analog_targeting_stroke"),
-		"set_targeting_drift_callable": Callable(self, "_set_analog_targeting_drift"),
-		"begin_fire_sequence_callable": Callable(self, "_begin_fire_sequence_from_lock"),
-		"is_enemy_fire_cinematic_active_callable": Callable(self, "_is_enemy_fire_cinematic_active"),
-		"state_changed_callable": Callable(self, "_on_combat_view_flow_state_changed")
+	combat_view_flow_controller.configure({"cockpit": self})
+	combat_view_flow_controller.analog_hud_visibility_changed.connect(_set_analog_hud_visible)
+	combat_view_flow_controller.analog_heartbeat_play_requested.connect(_play_analog_heartbeat)
+	combat_view_flow_controller.analog_heartbeat_stop_requested.connect(_stop_analog_heartbeat)
+	combat_view_flow_controller.target_dossier_show_requested.connect(_show_target_dossier)
+	combat_view_flow_controller.target_dossier_hide_requested.connect(_hide_target_dossier)
+	combat_view_flow_controller.targeting_stroke_reset_requested.connect(_reset_analog_targeting_stroke)
+	combat_view_flow_controller.targeting_drift_changed.connect(_set_analog_targeting_drift)
+	combat_view_flow_controller.fire_sequence_requested.connect(_begin_fire_sequence_from_lock)
+
+func _finalize_combat_view_flow_refs() -> void:
+	if not combat_view_flow_controller:
+		return
+	combat_view_flow_controller.set_runtime_refs({
+		"gun_cam": find_child("GunCam_R", true) as Camera3D,
+		"fire_cam": find_child("FireCam_R", true) as Camera3D,
+		"cinematic_camera": cinematic_camera,
+		"player_camera": camera,
+		"analog_targeting_controller": analog_targeting_controller,
+		"analog_aim_solution_controller": analog_aim_solution_controller,
+		"enemy_fire_cinematic_controller": enemy_fire_cinematic_controller,
 	})
 
 func _setup_player_hit_response_controller() -> void:
@@ -390,7 +389,7 @@ func _refresh_player_hit_response_controller() -> void:
 	})
 
 func _should_loop_analog_heartbeat() -> bool:
-	return combat_view_state == CombatViewState.ANALOG_AIM_VIEW
+	return combat_view_flow_controller and combat_view_flow_controller.combat_view_state == CombatViewState.ANALOG_AIM_VIEW
 
 func _play_analog_heartbeat() -> void:
 	if analog_heartbeat_controller and analog_heartbeat_controller.has_method("play"):
@@ -400,16 +399,11 @@ func _stop_analog_heartbeat() -> void:
 	if analog_heartbeat_controller and analog_heartbeat_controller.has_method("stop"):
 		analog_heartbeat_controller.stop()
 
-func _on_combat_view_flow_state_changed(state: Dictionary) -> void:
-	combat_view_state = int(state["combat_view_state"])
-	is_transitioning = bool(state["is_transitioning"])
-	current_analog_drift_multiplier = float(state["current_analog_drift_multiplier"])
-
 func _reset_analog_aim_solution() -> float:
 	if analog_aim_solution_controller:
 		analog_aim_solution_controller.reset_for_aim()
 		return analog_aim_solution_controller.get_stage_drift_multiplier()
-	return current_analog_drift_multiplier
+	return 1.0
 
 func _reset_analog_targeting_stroke() -> void:
 	if analog_targeting_controller:
@@ -590,7 +584,7 @@ func _input(event):
 			if main_camera_controller.handle_mouse_button(event):
 				return
 
-	if event is InputEventMouseMotion and combat_view_state == CombatViewState.NORMAL_VIEW and not is_reloading and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+	if event is InputEventMouseMotion and combat_view_flow_controller.combat_view_state == CombatViewState.NORMAL_VIEW and not is_reloading and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if main_camera_controller and main_camera_controller.has_method("handle_orbit_motion"):
 			main_camera_controller.handle_orbit_motion(event.relative, mouse_sensitivity)
 
@@ -605,7 +599,7 @@ func _process(delta):
 
 	# Butter-Smooth Blend
 	if main_camera_controller and main_camera_controller.has_method("update_fov"):
-		main_camera_controller.update_fov(delta, is_transitioning)
+		main_camera_controller.update_fov(delta, combat_view_flow_controller.is_transitioning)
 
 	if player_damage_model and player_damage_model.has_method("update"):
 		player_damage_model.update(delta)
@@ -632,7 +626,7 @@ func _process(delta):
 		if enemy_fire_cinematic_controller.is_active():
 			enemy_fire_cinematic_controller.update(delta)
 
-	if combat_view_state == CombatViewState.NORMAL_VIEW and not is_transitioning:
+	if combat_view_flow_controller.combat_view_state == CombatViewState.NORMAL_VIEW and not combat_view_flow_controller.is_transitioning:
 		if main_camera_controller and main_camera_controller.has_method("update_orbit"):
 			main_camera_controller.update_orbit(delta, sway_time, base_sway_amount, current_spread)
 
@@ -652,13 +646,13 @@ func _process(delta):
 		current_target_range = 0.0
 		is_on_target = false
 
-	if combat_view_state == CombatViewState.ANALOG_AIM_VIEW:
+	if combat_view_flow_controller.combat_view_state == CombatViewState.ANALOG_AIM_VIEW:
 		_update_analog_aim(delta)
 
 	sway_time += delta
-	if combat_view_state == CombatViewState.GUN_CAM_VIEW and not is_transitioning:
+	if combat_view_flow_controller.combat_view_state == CombatViewState.GUN_CAM_VIEW and not combat_view_flow_controller.is_transitioning:
 		_sync_plain_gun_camera()
-	elif combat_view_state == CombatViewState.ANALOG_AIM_VIEW and not is_transitioning:
+	elif combat_view_flow_controller.combat_view_state == CombatViewState.ANALOG_AIM_VIEW and not combat_view_flow_controller.is_transitioning:
 		_update_analog_camera_presentation(delta)
 
 	if analog_reticle_hud:
@@ -696,7 +690,7 @@ func _update_analog_aim(delta: float) -> void:
 		analog_reticle_hud.set_solution(float(display["hit_chance"]), str(display["range_band"]), true)
 
 func _get_aim_query_camera() -> Camera3D:
-	if combat_view_state != CombatViewState.NORMAL_VIEW and cinematic_camera:
+	if combat_view_flow_controller.combat_view_state != CombatViewState.NORMAL_VIEW and cinematic_camera:
 		return cinematic_camera
 	return camera
 
@@ -716,7 +710,7 @@ func _set_analog_hud_visible(is_visible: bool) -> void:
 	if analog_reticle_hud:
 		analog_reticle_hud.visible = is_visible
 	if dossier_presenter and dossier_presenter.has_method("sync_view_visibility"):
-		dossier_presenter.sync_view_visibility(combat_view_state == CombatViewState.NORMAL_VIEW)
+		dossier_presenter.sync_view_visibility(combat_view_flow_controller.combat_view_state == CombatViewState.NORMAL_VIEW)
 
 func _intersect_target_ray(source_camera: Camera3D, max_distance: float) -> Dictionary:
 	if target_query_helper:
@@ -745,14 +739,13 @@ func _is_player_tree_node(node: Node) -> bool:
 
 func _sync_plain_gun_camera() -> void:
 	if combat_view_flow_controller:
-		combat_view_flow_controller.sync_plain_gun_camera(cinematic_camera, guncam_fov)
+		combat_view_flow_controller.sync_plain_gun_camera(guncam_fov)
 
 func _update_analog_camera_presentation(delta: float) -> void:
 	if combat_view_flow_controller:
 		combat_view_flow_controller.update_analog_camera_presentation(
 			delta,
-			cinematic_camera,
-			analog_aim_solution_controller,
+			last_ray_result,
 			aim_zoom_blend_speed,
 			aim_camera_chunk_jump_amount,
 			aim_camera_chunk_settle_speed
@@ -785,11 +778,11 @@ func _begin_aim_flow() -> void:
 	if not is_instance_valid(camera):
 		_try_bind_main_camera()
 	if combat_view_flow_controller:
-		combat_view_flow_controller.begin_aim_flow(is_reloading, camera, cinematic_camera, CombatViewState.NORMAL_VIEW, CombatViewState.GUN_CAM_VIEW, CombatViewState.ANALOG_AIM_VIEW, transition_time, guncam_fov)
+		combat_view_flow_controller.begin_aim_flow(is_reloading, CombatViewState.NORMAL_VIEW, CombatViewState.GUN_CAM_VIEW, CombatViewState.ANALOG_AIM_VIEW, transition_time, guncam_fov)
 
 func _enter_analog_aim_view() -> void:
 	if combat_view_flow_controller:
-		combat_view_flow_controller.enter_analog_aim_view(camera, cinematic_camera, CombatViewState.ANALOG_AIM_VIEW)
+		combat_view_flow_controller.enter_analog_aim_view(CombatViewState.ANALOG_AIM_VIEW, last_ray_result)
 
 func _is_target_aligned() -> bool:
 	if not alignment_required:
@@ -852,21 +845,19 @@ func _disrupt_aim_after_fire() -> void:
 ## How much to slow down time during the transition (0.1 = 10% speed).
 @export var slomo_scale: float = 0.1
 
-var is_transitioning: bool = false
-
 func fire_cannon():
-	if is_reloading or is_transitioning or _is_enemy_fire_cinematic_active():
+	if is_reloading or combat_view_flow_controller.is_transitioning or _is_enemy_fire_cinematic_active():
 		return
 
-	if combat_view_state == CombatViewState.NORMAL_VIEW:
+	if combat_view_flow_controller.combat_view_state == CombatViewState.NORMAL_VIEW:
 		_begin_aim_flow()
 		return
 
-	if combat_view_state == CombatViewState.GUN_CAM_VIEW:
+	if combat_view_flow_controller.combat_view_state == CombatViewState.GUN_CAM_VIEW:
 		_enter_analog_aim_view()
 		return
 
-	if combat_view_state != CombatViewState.ANALOG_AIM_VIEW:
+	if combat_view_flow_controller.combat_view_state != CombatViewState.ANALOG_AIM_VIEW:
 		return
 
 	var shot_lock = _build_shot_lock(cinematic_camera)
@@ -875,13 +866,9 @@ func fire_cannon():
 
 func _return_to_fire_cam_then_fire(shot_lock: Dictionary) -> void:
 	if combat_view_flow_controller:
-		combat_view_flow_controller.return_to_fire_cam_then_fire(shot_lock, cinematic_camera, CombatViewState.FIRING_FROM_FIRE_CAM, analog_to_fire_cam_return_time)
+		combat_view_flow_controller.return_to_fire_cam_then_fire(shot_lock, CombatViewState.FIRING_FROM_FIRE_CAM, analog_to_fire_cam_return_time)
 
 func _begin_fire_sequence_from_lock(shot_lock: Dictionary) -> void:
-	combat_view_state = CombatViewState.FIRING_FROM_FIRE_CAM
-	_set_analog_hud_visible(false)
-	_stop_analog_heartbeat()
-
 	_perform_actual_shot(
 		shot_lock["target_point"],
 		shot_lock["will_hit_enemy"],
@@ -899,9 +886,6 @@ func _build_shot_lock(source_camera: Camera3D) -> Dictionary:
 @export var bullet_slomo: float = 0.2
 
 func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool, focal_point: Vector3, impact_anchor: Node3D):
-	combat_view_state = CombatViewState.FIRING_FROM_FIRE_CAM
-	_set_analog_hud_visible(false)
-	_stop_analog_heartbeat()
 	_refresh_player_fire_controller()
 	if player_fire_controller:
 		player_fire_controller.perform_actual_shot(target_point, will_hit_enemy, focal_point, impact_anchor)
@@ -952,10 +936,5 @@ func _on_projectile_cinematic_miss(hit_pos: Vector3) -> void:
 func _on_projectile_cinematic_end() -> void:
 	if combat_view_flow_controller:
 		combat_view_flow_controller.reset_to_normal(CombatViewState.NORMAL_VIEW)
-	else:
-		combat_view_state = CombatViewState.NORMAL_VIEW
-		_set_analog_hud_visible(false)
-		_stop_analog_heartbeat()
-		_hide_target_dossier()
 	if combat_bark_ui:
 		combat_bark_ui.hide_bark()
