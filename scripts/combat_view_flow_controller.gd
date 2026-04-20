@@ -95,7 +95,7 @@ func update_analog_camera_presentation(delta: float, cinematic_camera: Camera3D,
 		var drifted_point = _get_drifted_analog_target_point(target_point, delta)
 		cinematic_camera.look_at(drifted_point, Vector3.UP)
 
-func begin_aim_flow(is_reloading: bool, camera: Camera3D, cinematic_camera: Camera3D, normal_view_state: int, gun_cam_state: int, transition_time: float, guncam_fov: float) -> void:
+func begin_aim_flow(is_reloading: bool, camera: Camera3D, cinematic_camera: Camera3D, normal_view_state: int, gun_cam_state: int, analog_aim_state: int, transition_time: float, guncam_fov: float) -> void:
 	if is_reloading or is_transitioning or combat_view_state != normal_view_state:
 		return
 	if not camera or not cinematic_camera:
@@ -126,7 +126,7 @@ func begin_aim_flow(is_reloading: bool, camera: Camera3D, cinematic_camera: Came
 	, 0.0, 1.0, transition_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	view_transition_tween.finished.connect(func():
 		is_transitioning = false
-		enter_analog_aim_view(camera, cinematic_camera, 2)
+		enter_analog_aim_view(camera, cinematic_camera, analog_aim_state)
 	)
 
 func enter_analog_aim_view(camera: Camera3D, cinematic_camera: Camera3D, analog_aim_state: int) -> void:

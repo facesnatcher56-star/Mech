@@ -772,7 +772,7 @@ func _begin_aim_flow() -> void:
 	if not is_instance_valid(camera):
 		_try_bind_main_camera()
 	if combat_view_flow_controller:
-		combat_view_flow_controller.begin_aim_flow(is_reloading, camera, cinematic_camera, CombatViewState.NORMAL_VIEW, CombatViewState.GUN_CAM_VIEW, transition_time, guncam_fov)
+		combat_view_flow_controller.begin_aim_flow(is_reloading, camera, cinematic_camera, CombatViewState.NORMAL_VIEW, CombatViewState.GUN_CAM_VIEW, CombatViewState.ANALOG_AIM_VIEW, transition_time, guncam_fov)
 
 func _enter_analog_aim_view() -> void:
 	if combat_view_flow_controller:
