@@ -15,6 +15,7 @@ const PLAYER_FIRE_CONTROLLER = preload("res://scripts/player_fire_controller.gd"
 const RELOAD_STATUS_CONTROLLER = preload("res://scripts/reload_status_controller.gd")
 const GROUND_ALIGNMENT_CONTROLLER = preload("res://scripts/ground_alignment_controller.gd")
 const PLAYER_HIT_RESPONSE_CONTROLLER = preload("res://scripts/player_hit_response_controller.gd")
+const TARGET_QUERY_HELPER = preload("res://scripts/target_query_helper.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -201,6 +202,7 @@ var player_fire_controller: Node = null
 var reload_status_controller: Node = null
 var ground_alignment_controller: Node = null
 var player_hit_response_controller: Node = null
+var target_query_helper: Node = null
 
 # --- RECOIL TRACKING ---
 
@@ -214,6 +216,7 @@ func _ready():
 	_setup_analog_aim_solution_controller()
 	_setup_reload_status_controller()
 	_setup_ground_alignment_controller()
+	_setup_target_query_helper()
 	_setup_player_hit_response_controller()
 	hit_sound = _find_audio_player_3d("HitSound")
 	_set_analog_hud_visible(false)
@@ -329,6 +332,15 @@ func _setup_ground_alignment_controller() -> void:
 	add_child(ground_alignment_controller)
 	ground_alignment_controller.configure({
 		"body": self
+	})
+
+func _setup_target_query_helper() -> void:
+	target_query_helper = TARGET_QUERY_HELPER.new()
+	target_query_helper.name = "TargetQueryHelper"
+	add_child(target_query_helper)
+	target_query_helper.configure({
+		"root": self,
+		"sweep_exclusions_callable": Callable(self, "_get_sweep_exclusions")
 	})
 
 func _setup_player_hit_response_controller() -> void:
@@ -659,82 +671,28 @@ func _set_analog_hud_visible(is_visible: bool) -> void:
 		dossier_presenter.sync_view_visibility(combat_view_state == CombatViewState.NORMAL_VIEW)
 
 func _intersect_target_ray(source_camera: Camera3D, max_distance: float) -> Dictionary:
-	var space_state = get_world_3d().direct_space_state
-	var direction = -source_camera.global_transform.basis.z
-	var ray_from = source_camera.global_position
-	var ray_to = source_camera.global_position + (direction * max_distance)
-	var excluded: Array[RID] = []
-
-	for i in range(16):
-		if ray_from.distance_to(ray_to) < 0.01:
-			return {}
-		var query = PhysicsRayQueryParameters3D.create(ray_from, ray_to)
-		query.exclude = excluded
-		var result = space_state.intersect_ray(query)
-		if result.is_empty():
-			return {}
-		if _is_world_targeting_noise(result.collider) or _is_player_tree_node(result.collider as Node):
-			if result.collider is CollisionObject3D:
-				excluded.append((result.collider as CollisionObject3D).get_rid())
-			ray_from = result.position + (direction * 0.08)
-			continue
-		if _is_enemy_collider(result.collider):
-			return result
-		return {}
+	if target_query_helper:
+		return target_query_helper.intersect_target_ray(source_camera, max_distance)
 	return {}
 
 func _is_world_targeting_noise(collider: Object) -> bool:
-	if not collider or not collider is Node:
-		return false
-	var current = collider as Node
-	while current:
-		var node_name = current.name.to_lower()
-		if node_name == "worldsetup" or node_name == "environmentprops":
-			return true
-		if node_name == "mechscalegravelroad" or node_name == "grassblades":
-			return true
-		if node_name == "broadleaftree" or node_name == "pinetree" or node_name == "rock":
-			return true
-		if node_name == "mechscalebuilding":
-			return true
-		current = current.get_parent()
+	if target_query_helper:
+		return target_query_helper.is_world_targeting_noise(collider)
 	return false
 
 func _is_enemy_collider(collider: Object) -> bool:
-	if not collider:
-		return false
-	if collider is Node:
-		var node = collider as Node
-		if _is_enemy_target_node(node):
-			return true
-		var parent = node.get_parent()
-		while parent:
-			if _is_enemy_target_node(parent):
-				return true
-			parent = parent.get_parent()
+	if target_query_helper:
+		return target_query_helper.is_enemy_collider(collider)
 	return false
 
 func _is_enemy_target_node(node: Node) -> bool:
-	if not node or _is_player_tree_node(node):
-		return false
-	if node.is_in_group("enemy"):
-		return true
-
-	var node_name = node.name.to_lower()
-	if "enemy" in node_name:
-		return true
-	if "zezlan" in node_name:
-		return true
-	if node_name == "enemymech":
-		return true
+	if target_query_helper:
+		return target_query_helper.is_enemy_target_node(node)
 	return false
 
 func _is_player_tree_node(node: Node) -> bool:
-	var current = node
-	while current:
-		if current.is_in_group("player"):
-			return true
-		current = current.get_parent()
+	if target_query_helper:
+		return target_query_helper.is_player_tree_node(node)
 	return false
 
 func _sync_plain_gun_camera() -> void:
