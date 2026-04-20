@@ -69,6 +69,26 @@ material = SubResource("StandardMaterial3D_gqmmt")
 [sub_resource type="BoxShape3D" id="BoxShape3D_leg"]
 size = Vector3(0.25, 0.8, 0.25)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bark"]
+bg_color = Color(0, 0, 0, 0.85)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.3, 0.3, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="LabelSettings" id="LabelSettings_bark"]
+font_size = 22
+font_color = Color(0.9, 0.9, 0.9, 1)
+
+[sub_resource type="LabelSettings" id="LabelSettings_name"]
+font_size = 14
+font_color = Color(0.5, 0.5, 0.5, 1)
+
 [sub_resource type="Animation" id="Animation_dp3eg"]
 resource_name = "Fire"
 length = 2.0
@@ -105,26 +125,6 @@ _data = {
 &"Fire": SubResource("Animation_dp3eg"),
 &"RESET": SubResource("Animation_0ld40")
 }
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bark"]
-bg_color = Color(0, 0, 0, 0.85)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.3, 0.3, 0.3, 1)
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
-
-[sub_resource type="LabelSettings" id="LabelSettings_bark"]
-font_size = 22
-font_color = Color(0.9, 0.9, 0.9, 1)
-
-[sub_resource type="LabelSettings" id="LabelSettings_name"]
-font_size = 14
-font_color = Color(0.5, 0.5, 0.5, 1)
 
 [node name="Main" type="Node3D" unique_id=2077343884]
 
@@ -186,8 +186,6 @@ script = ExtResource("2_script")
 firecam_duration = 0.2
 impact_side_camera_trigger_distance = 60.0
 impact_side_camera_time_scale = 0.6
-camera_debug_enabled = false
-camera_debug_hud_enabled = false
 analog_heartbeat_volume_db = 5.0
 
 [node name="DirectionalSmoke" type="GPUParticles3D" parent="WIPtestmech/Armature" parent_id_path=PackedInt32Array(1679724251, 359783737) index="0" unique_id=641991123]
@@ -485,6 +483,10 @@ far = 2000.0
 [node name="EnemyMuzzle" type="Marker3D" parent="zezlan" unique_id=3000011]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00577, 1.25746, 0.55415)
 
+[node name="ZezlanFirePlayer" type="AnimationPlayer" parent="zezlan" unique_id=308753981]
+root_node = NodePath("../..")
+libraries/ = SubResource("AnimationLibrary_gqmmt")
+
 [node name="FiringSequenceCam" type="Camera3D" parent="." unique_id=3000012]
 transform = Transform3D(-0.4257003, 0, -0.9048642, 0, 1, 0, 0.9048642, 0, -0.4257003, 30.719206, 3.2339597, 150.19206)
 
@@ -563,10 +565,6 @@ transform = Transform3D(-4.371139e-08, -0.06975651, 0.9975641, 0, 0.9975641, 0.0
 
 [node name="Muzzle" type="Marker3D" parent="TestSoldier/RPGTube" unique_id=1897734595]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.58, 0)
-
-[node name="ZezlanFirePlayer" type="AnimationPlayer" parent="zezlan" unique_id=308753981]
-root_node = NodePath("../..")
-libraries/ = SubResource("AnimationLibrary_gqmmt")
 
 [editable path="WIPtestmech"]
 [editable path="zezlan"]

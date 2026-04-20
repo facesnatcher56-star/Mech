@@ -4,12 +4,12 @@ var camera: Camera3D = null
 @onready var cockpit_mesh = self
 const PROJECTILE = preload("res://scenes/projectile.tscn")
 const DEFAULT_ANALOG_HEARTBEAT = preload("res://assets/Sounds/heartbeats-61.wav")
-const TARGET_DOSSIER_UI = preload("res://scripts/target_dossier_ui.gd")
+const PLAYER_DAMAGE_MODEL = preload("res://scripts/player_damage_model.gd")
+const COMBAT_DOSSIER_PRESENTER = preload("res://scripts/combat_dossier_presenter.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
 var is_dead: bool = false
-var damage_flash_timer: float = 0.0
 
 var mouse_sensitivity: float = 0.002
 var sway_time: float = 0.0
@@ -165,12 +165,6 @@ var hit_sound: AudioStreamPlayer3D = null
 @export var medium_max_hit_chance: float = 0.78
 @export var long_max_hit_chance: float = 0.70
 
-@export_group("Camera System Debug")
-## Enables logging of camera switches, positions, and view durations.
-@export var camera_debug_enabled: bool = true
-## Shows a live on-screen HUD with all camera state every frame.
-@export var camera_debug_hud_enabled: bool = true
-
 @export_group("Analog Aim Heartbeat")
 ## Heartbeat loop played from the analog aim camera while aiming.
 @export var analog_heartbeat_stream: AudioStream = DEFAULT_ANALOG_HEARTBEAT
@@ -188,7 +182,6 @@ var cinematic_timer: float = 0.0
 var has_missed_shot: bool = false
 var shot_resolved: bool = false
 var shot_will_hit_enemy: bool = false
-var shot_collision_debug_reported: bool = false
 var impact_side_camera_anchor: Node3D = null
 var impact_side_camera_active: bool = false
 var aim_settle: float = 0.09
@@ -213,131 +206,11 @@ var aim_camera_session_start: Vector3 = Vector3.ZERO
 var aim_camera_session_target: Vector3 = Vector3.ZERO
 var aim_camera_chunk_stage: int = 0
 var analog_heartbeat_player: AudioStreamPlayer
-var target_dossier_ui: Control = null
-var self_dossier_ui: Control = null
-var enemy_status_ui: Control = null
+var player_damage_model: Node = null
+var dossier_presenter: Node = null
 var enemy_fire_cinematic_active: bool = false
-var structure_hp: int = 0
-var torso_hp: int = 0
-var left_arm_hp: int = 0
-var right_arm_hp: int = 0
-var left_leg_hp: int = 0
-var right_leg_hp: int = 0
 var main_camera_orbit_yaw: float = 0.0
 var main_camera_orbit_pitch: float = 0.0
-
-# --- CAMERA DEBUG TRACKING ---
-var _debug_cam_last_switch_time: float = 0.0
-var _debug_cam_current_view_name: String = "COCKPIT_MAIN"
-var _debug_hud_label: Label = null
-
-func _setup_debug_hud() -> void:
-	_debug_hud_label = Label.new()
-	_debug_hud_label.position = Vector2(10, 10)
-	_debug_hud_label.add_theme_font_size_override("font_size", 13)
-	_debug_hud_label.add_theme_color_override("font_color", Color(0.0, 1.0, 0.4))
-	_debug_hud_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
-	_debug_hud_label.add_theme_constant_override("shadow_offset_x", 1)
-	_debug_hud_label.add_theme_constant_override("shadow_offset_y", 1)
-	get_tree().root.call_deferred("add_child", _debug_hud_label)
-
-func _phase_name(p: int) -> String:
-	match p:
-		0: return "0:OFF"
-		1: return "1:FIRE_CAM"
-		2: return "2:SHELL_TRACK"
-		3: return "3:LINGER"
-		_: return str(p) + ":UNKNOWN"
-
-func _view_state_name(v: int) -> String:
-	match v:
-		CombatViewState.NORMAL_VIEW:         return "NORMAL_VIEW"
-		CombatViewState.GUN_CAM_VIEW:        return "GUN_CAM_VIEW"
-		CombatViewState.ANALOG_AIM_VIEW:     return "ANALOG_AIM_VIEW"
-		CombatViewState.FIRING_FROM_FIRE_CAM: return "FIRING_FROM_FIRE_CAM"
-		_: return "UNKNOWN"
-
-func _update_debug_hud() -> void:
-	if not _debug_hud_label:
-		return
-	var cin_valid = cinematic_camera != null
-	var cin_pos   = cinematic_camera.global_position if cin_valid else Vector3.ZERO
-	var cin_rot   = cinematic_camera.rotation_degrees if cin_valid else Vector3.ZERO
-	var cin_cur   = cinematic_camera.current if cin_valid else false
-	var cin_fov   = cinematic_camera.fov if cin_valid else 0.0
-	var cock_pos  = camera.global_position if camera else Vector3.ZERO
-	var cock_rot  = camera.rotation_degrees if camera else Vector3.ZERO
-	var cock_cur  = camera.current if camera else false
-	var cock_fov  = camera.fov if camera else 0.0
-
-	var shell_pos_str := "null"
-	var shell_dist_str := "--"
-	if is_instance_valid(active_shell):
-		shell_pos_str = _fmt_debug_vec(active_shell.global_position)
-		shell_dist_str = "%.1fm" % active_shell.global_position.distance_to(target_hit_point)
-
-	var side_zone := Vector3.ZERO
-	var dist_to_zone := 0.0
-	if cinematic_phase >= 2 and is_instance_valid(active_shell):
-		side_zone = _get_impact_side_camera_world_position()
-		dist_to_zone = active_shell.global_position.distance_to(side_zone)
-	elif cinematic_phase >= 2:
-		side_zone = _get_impact_side_camera_world_position()
-
-	var threshold_str := "--"
-	match cinematic_phase:
-		1: threshold_str = "%.3f / %.3f" % [cinematic_timer, firecam_duration]
-		2: threshold_str = "tracking (side_active=%s)" % str(impact_side_camera_active)
-		3: threshold_str = "%.3f / %.3f" % [cinematic_timer, _get_impact_resolve_linger_time()]
-
-	var lines := PackedStringArray()
-	lines.append("╔══ CAMERA DEBUG ══════════════════════════════╗")
-	lines.append("  view_state   : %s" % _view_state_name(combat_view_state))
-	lines.append("  phase        : %s" % _phase_name(cinematic_phase))
-	lines.append("  timer/thresh : %s" % threshold_str)
-	lines.append("  time_scale   : %.3f" % Engine.time_scale)
-	lines.append("  is_reloading : %s  reload %.2f/%.2fs" % [str(is_reloading), reload_timer, reload_duration])
-	lines.append("  shot_resolved: %s  will_hit: %s" % [str(shot_resolved), str(shot_will_hit_enemy)])
-	lines.append("  side_cam_act : %s  is_transitioning: %s" % [str(impact_side_camera_active), str(is_transitioning)])
-	lines.append("──────────────────────────────────────────────")
-	lines.append("  [CIN]  cur=%-5s fov=%4.1f  pos=%s" % [str(cin_cur), cin_fov, _fmt_debug_vec(cin_pos)])
-	lines.append("         rot=%s" % _fmt_debug_vec(cin_rot))
-	lines.append("  [COCK] cur=%-5s fov=%4.1f  pos=%s" % [str(cock_cur), cock_fov, _fmt_debug_vec(cock_pos)])
-	lines.append("         rot=%s" % _fmt_debug_vec(cock_rot))
-	lines.append("──────────────────────────────────────────────")
-	lines.append("  shell pos    : %s" % shell_pos_str)
-	lines.append("  shell→target : %s" % shell_dist_str)
-	lines.append("  side_zone    : %s" % _fmt_debug_vec(side_zone))
-	if cinematic_phase == 2 and is_instance_valid(active_shell):
-		lines.append("  dist→zone    : %.1fm / trigger %.1fm" % [dist_to_zone, impact_side_camera_trigger_distance])
-	lines.append("  target_hit   : %s" % _fmt_debug_vec(target_hit_point))
-	lines.append("╚══════════════════════════════════════════════╝")
-	_debug_hud_label.text = "\n".join(lines)
-
-func _log_camera_switch(new_view_name: String) -> void:
-	if not camera_debug_enabled: return
-	var now = Time.get_ticks_msec() / 1000.0
-	var duration = now - _debug_cam_last_switch_time
-	var from_name = _debug_cam_current_view_name  # capture now, before update
-	_debug_cam_last_switch_time = now
-	_debug_cam_current_view_name = new_view_name
-	get_tree().process_frame.connect(func():
-		var cin_valid = cinematic_camera != null
-		var cin_pos   = cinematic_camera.global_position if cin_valid else Vector3.ZERO
-		var cin_cur   = cinematic_camera.current if cin_valid else false
-		var cock_cur  = camera.current if camera else false
-		var shell_str = _fmt_debug_vec(active_shell.global_position) if is_instance_valid(active_shell) else "none"
-		print(
-			"[CAM] %-32s" % (from_name + " →"),
-			" %-34s" % new_view_name,
-			" | phase=%s" % _phase_name(cinematic_phase),
-			" | ts=%.3f" % Engine.time_scale,
-			" | cin.cur=%s cock.cur=%s" % [str(cin_cur), str(cock_cur)],
-			" | cin.pos=%s" % _fmt_debug_vec(cin_pos),
-			" | shell=%s" % shell_str,
-			" | held=%.3fs" % duration
-		)
-	, CONNECT_ONE_SHOT)
 
 # --- RECOIL TRACKING ---
 var recoil_tween: Tween
@@ -348,7 +221,7 @@ func _ready():
 	analog_sway_rng.randomize()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
-	_reset_player_hp()
+	_setup_player_damage_model()
 	camera = _find_main_camera()
 	if camera:
 		_detach_main_camera_from_mech()
@@ -365,11 +238,7 @@ func _ready():
 	cinematic_camera.current = false
 	_setup_analog_heartbeat_player()
 	get_tree().root.call_deferred("add_child", cinematic_camera)
-	call_deferred("_setup_target_dossier_ui")
-	call_deferred("_setup_self_dossier_ui")
-	call_deferred("_setup_enemy_status_ui")
-	if camera_debug_hud_enabled:
-		call_deferred("_setup_debug_hud")
+	call_deferred("_setup_dossier_presenter")
 
 func _setup_analog_heartbeat_player() -> void:
 	analog_heartbeat_player = AudioStreamPlayer.new()
@@ -395,107 +264,59 @@ func _stop_analog_heartbeat() -> void:
 	if analog_heartbeat_player:
 		analog_heartbeat_player.stop()
 
-func _setup_target_dossier_ui() -> void:
+func _setup_dossier_presenter() -> void:
 	var canvas_layer = get_node_or_null("CanvasLayer")
 	if not canvas_layer:
 		return
-	target_dossier_ui = TARGET_DOSSIER_UI.new()
-	target_dossier_ui.name = "TargetDossierUI"
-	canvas_layer.add_child(target_dossier_ui)
+	dossier_presenter = COMBAT_DOSSIER_PRESENTER.new()
+	dossier_presenter.name = "CombatDossierPresenter"
+	add_child(dossier_presenter)
+	dossier_presenter.configure(self, canvas_layer)
 
-func _setup_self_dossier_ui() -> void:
-	var canvas_layer = get_node_or_null("CanvasLayer")
-	if not canvas_layer:
-		return
-	self_dossier_ui = TARGET_DOSSIER_UI.new()
-	self_dossier_ui.name = "SelfDossierUI"
-	self_dossier_ui.anchor_corner = TARGET_DOSSIER_UI.AnchorCorner.TOP_LEFT
-	self_dossier_ui.scale = Vector2(0.65, 0.65)
-	canvas_layer.add_child(self_dossier_ui)
-	self_dossier_ui.show_dossier(get_hp_snapshot())
-
-func _setup_enemy_status_ui() -> void:
-	var canvas_layer = get_node_or_null("CanvasLayer")
-	if not canvas_layer:
-		return
-	enemy_status_ui = TARGET_DOSSIER_UI.new()
-	enemy_status_ui.name = "EnemyStatusUI"
-	enemy_status_ui.anchor_corner = TARGET_DOSSIER_UI.AnchorCorner.TOP_RIGHT
-	enemy_status_ui.scale = Vector2(0.65, 0.65)
-	canvas_layer.add_child(enemy_status_ui)
-	enemy_status_ui.visible = false
-
-func _reset_player_hp() -> void:
-	structure_hp = max_structure_hp
-	torso_hp = max_torso_hp
-	left_arm_hp = max_left_arm_hp
-	right_arm_hp = max_right_arm_hp
-	left_leg_hp = max_left_leg_hp
-	right_leg_hp = max_right_leg_hp
+func _setup_player_damage_model() -> void:
+	player_damage_model = PLAYER_DAMAGE_MODEL.new()
+	player_damage_model.name = "PlayerDamageModel"
+	add_child(player_damage_model)
+	player_damage_model.configure({
+		"max_structure_hp": max_structure_hp,
+		"max_torso_hp": max_torso_hp,
+		"max_left_arm_hp": max_left_arm_hp,
+		"max_right_arm_hp": max_right_arm_hp,
+		"max_left_leg_hp": max_left_leg_hp,
+		"max_right_leg_hp": max_right_leg_hp,
+		"hit_damage": hit_damage
+	})
+	player_damage_model.reset()
+	player_damage_model.destroyed.connect(_on_player_destroyed)
+	is_dead = player_damage_model.is_dead
 
 func get_hp_snapshot() -> Dictionary:
-	return {
-		"name": "PLAYER",
-		"structure": {"current": structure_hp, "max": max_structure_hp},
-		"parts": {
-			"torso":     {"label": "TORSO",   "current": torso_hp,     "max": max_torso_hp,     "broken": torso_hp <= 0},
-			"left_arm":  {"label": "L ARM",   "current": left_arm_hp,  "max": max_left_arm_hp,  "broken": left_arm_hp <= 0},
-			"right_arm": {"label": "R ARM",   "current": right_arm_hp, "max": max_right_arm_hp, "broken": right_arm_hp <= 0},
-			"left_leg":  {"label": "L LEG",   "current": left_leg_hp,  "max": max_left_leg_hp,  "broken": left_leg_hp <= 0},
-			"right_leg": {"label": "R LEG",   "current": right_leg_hp, "max": max_right_leg_hp, "broken": right_leg_hp <= 0},
-		},
-		"destroyed": is_dead
-	}
+	if player_damage_model and player_damage_model.has_method("get_hp_snapshot"):
+		return player_damage_model.get_hp_snapshot()
+	return {}
 
 func _show_target_dossier() -> void:
-	if not target_dossier_ui:
-		return
-	var snapshot := _get_current_target_hp_snapshot()
-	if snapshot.is_empty():
-		target_dossier_ui.hide_dossier()
-	else:
-		target_dossier_ui.show_dossier(snapshot)
+	if dossier_presenter and dossier_presenter.has_method("show_target_dossier"):
+		dossier_presenter.show_target_dossier()
 
 func _hide_target_dossier() -> void:
-	if target_dossier_ui:
-		target_dossier_ui.hide_dossier()
+	if dossier_presenter and dossier_presenter.has_method("hide_target_dossier"):
+		dossier_presenter.hide_target_dossier()
 
 func _get_current_target_hp_snapshot() -> Dictionary:
-	var target := _get_analog_target_node()
-	var damage_model := _find_damage_model_node(target)
-	if damage_model and damage_model.has_method("get_hp_snapshot"):
-		return damage_model.get_hp_snapshot()
-	for node in get_tree().get_nodes_in_group("enemy"):
-		if node is Node:
-			damage_model = _find_damage_model_node(node)
-			if damage_model and damage_model.has_method("get_hp_snapshot"):
-				return damage_model.get_hp_snapshot()
+	if dossier_presenter and dossier_presenter.has_method("get_current_target_hp_snapshot"):
+		return dossier_presenter.get_current_target_hp_snapshot()
 	return {}
 
 func _find_damage_model_node(start_node: Node) -> Node:
-	var node := start_node
-	while node:
-		if node.has_method("apply_shell_damage") and node.has_method("get_hp_snapshot"):
-			return node
-		node = node.get_parent()
+	if dossier_presenter and dossier_presenter.has_method("find_damage_model_node"):
+		return dossier_presenter.find_damage_model_node(start_node)
 	return null
 
 func _apply_enemy_damage(body: Node, hit_pos: Vector3) -> Dictionary:
-	var damage_model := _find_damage_model_node(body)
-	if not damage_model or not damage_model.has_method("apply_shell_damage"):
-		return {}
-
-	var result: Dictionary = damage_model.apply_shell_damage(body, hit_pos)
-	if target_dossier_ui and result.has("snapshot"):
-		var damage := int(result.get("damage", 0))
-		var region := str(result.get("region", "STRUCTURE"))
-		var line := "HIT %s  -%d" % [region, damage]
-		if bool(result.get("part_broken", false)):
-			line = "%s BROKEN" % region
-		if bool(result.get("destroyed", false)):
-			line = "TARGET DESTROYED"
-		target_dossier_ui.show_impact_line(line, str(result.get("part_key", "")), result["snapshot"])
-	return result
+	if dossier_presenter and dossier_presenter.has_method("apply_enemy_damage"):
+		return dossier_presenter.apply_enemy_damage(body, hit_pos)
+	return {}
 
 func _setup_big_gun():
 	visual_barrel = find_child("RightArm", true)
@@ -533,9 +354,6 @@ func _process(delta):
 	if not is_instance_valid(camera):
 		_try_bind_main_camera()
 
-	if camera_debug_hud_enabled:
-		_update_debug_hud()
-
 	# Butter-Smooth Blend
 	if camera and not is_transitioning:
 		main_fov = clampf(main_fov, min_fov_limit, max_fov_limit)
@@ -545,8 +363,9 @@ func _process(delta):
 		var real_delta = delta / Engine.time_scale if Engine.time_scale > 0.001 else delta
 		camera.fov = lerpf(camera.fov, target_fov, blend_speed * real_delta)
 
-	if damage_flash_timer > 0.0:
-		damage_flash_timer = max(0.0, damage_flash_timer - delta)
+	if player_damage_model and player_damage_model.has_method("update"):
+		player_damage_model.update(delta)
+		is_dead = player_damage_model.is_dead
 
 	# --- Ground Alignment (Stationary) ---
 	var ss_ground = get_world_3d().direct_space_state
@@ -573,18 +392,12 @@ func _process(delta):
 		current_spread = lerpf(current_spread, 0.0, delta * 0.5)
 
 	# Push player reload into self dossier every frame
-	if self_dossier_ui:
-		var snap := get_hp_snapshot()
-		snap["reload"] = {"progress": reload_progress, "label": "CANNON"}
-		self_dossier_ui.set_snapshot(snap)
+	if dossier_presenter and dossier_presenter.has_method("update_self_status"):
+		dossier_presenter.update_self_status(get_hp_snapshot(), reload_progress)
 
 	# Push enemy HP + reload into enemy status dossier every frame
-	if enemy_status_ui and enemy_status_ui.visible:
-		var enemy_snap := _get_current_target_hp_snapshot()
-		if not enemy_snap.is_empty():
-			enemy_status_ui.show_dossier(enemy_snap)
-		else:
-			enemy_status_ui.visible = false
+	if dossier_presenter and dossier_presenter.has_method("update_enemy_status"):
+		dossier_presenter.update_enemy_status()
 
 	if cinematic_phase > 0:
 		_update_cinematic(delta)
@@ -767,11 +580,8 @@ func _get_fire_camera_fov() -> float:
 func _set_analog_hud_visible(is_visible: bool) -> void:
 	if analog_reticle_hud:
 		analog_reticle_hud.visible = is_visible
-	if self_dossier_ui:
-		var _in_normal := (combat_view_state == CombatViewState.NORMAL_VIEW)
-		self_dossier_ui.visible = _in_normal
-	if enemy_status_ui:
-		enemy_status_ui.visible = (combat_view_state == CombatViewState.NORMAL_VIEW)
+	if dossier_presenter and dossier_presenter.has_method("sync_view_visibility"):
+		dossier_presenter.sync_view_visibility(combat_view_state == CombatViewState.NORMAL_VIEW)
 
 func _intersect_target_ray(source_camera: Camera3D, max_distance: float) -> Dictionary:
 	var space_state = get_world_3d().direct_space_state
@@ -958,13 +768,11 @@ func _begin_aim_flow() -> void:
 	, 0.0, 1.0, transition_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	view_transition_tween.finished.connect(func():
 		is_transitioning = false
-		_log_camera_switch("GUN_CAM_TRANSITION_COMPLETE")
 		_enter_analog_aim_view()
 	)
 
 func _enter_analog_aim_view() -> void:
 	combat_view_state = CombatViewState.ANALOG_AIM_VIEW
-	_log_camera_switch("ANALOG_AIM_VIEW")
 	camera.current = false
 	cinematic_camera.current = true
 	_set_analog_hud_visible(true)
@@ -1398,7 +1206,6 @@ func _return_to_fire_cam_then_fire(shot_lock: Dictionary) -> void:
 	, 0.0, 1.0, analog_to_fire_cam_return_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	view_transition_tween.finished.connect(func():
 		is_transitioning = false
-		_log_camera_switch("FIRING_CAM_READY")
 		_begin_fire_sequence_from_lock(shot_lock)
 	)
 
@@ -1470,7 +1277,6 @@ func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool):
 	has_missed_shot = false
 	shot_resolved = false
 	shot_will_hit_enemy = will_hit_enemy
-	shot_collision_debug_reported = false
 	impact_side_camera_active = false
 
 	# Snapshot the dedicated firing camera at this exact moment so it remains STATIONARY during recoil
@@ -1503,12 +1309,12 @@ func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool):
 		if combat_bark_ui:
 			combat_bark_ui.show_result(is_enemy, bark_part_name if is_enemy else "")
 
-		if not is_enemy and not has_missed_shot:
-			has_missed_shot = true
-			if target_dossier_ui:
-				target_dossier_ui.show_impact_line("NO DAMAGE", "", _get_current_target_hp_snapshot())
-			var damage_number_script = preload("res://scripts/damage_number.gd")
-			damage_number_script.display_text(hit_pos, "MISS", get_tree().current_scene, Color.ORANGE_RED)
+			if not is_enemy and not has_missed_shot:
+				has_missed_shot = true
+				if dossier_presenter and dossier_presenter.has_method("show_target_no_damage"):
+					dossier_presenter.show_target_no_damage()
+				var damage_number_script = preload("res://scripts/damage_number.gd")
+				damage_number_script.display_text(hit_pos, "MISS", get_tree().current_scene, Color.ORANGE_RED)
 		elif is_enemy:
 			if hit_sound:
 				hit_sound.global_position = hit_pos
@@ -1536,15 +1342,22 @@ func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool):
 
 
 func hit():
-	if is_dead: return
-	structure_hp = maxi(0, structure_hp - hit_damage)
-	torso_hp     = maxi(0, torso_hp - hit_damage)
-	damage_flash_timer = 2.0
+	if is_dead:
+		return
+	if not player_damage_model or not player_damage_model.has_method("apply_hit"):
+		return
+
+	var damage_result: Dictionary = player_damage_model.apply_hit()
+	if not bool(damage_result.get("applied", false)):
+		is_dead = bool(damage_result.get("destroyed", is_dead))
+		return
+
+	is_dead = bool(damage_result.get("destroyed", false))
 	is_reloading = true
 	reload_timer = 0.0
 
-	if self_dossier_ui:
-		self_dossier_ui.show_impact_line("HIT!", "torso", get_hp_snapshot())
+	if dossier_presenter and dossier_presenter.has_method("show_player_hit"):
+		dossier_presenter.show_player_hit(str(damage_result.get("part_key", "torso")), damage_result.get("snapshot", get_hp_snapshot()))
 
 	# If we take a hit during our outgoing cinematic, abort it
 	if cinematic_phase > 0:
@@ -1559,11 +1372,16 @@ func hit():
 		reset_tween.tween_property(camera, "h_offset", 0.0, 0.05).set_delay(0.3)
 		reset_tween.tween_property(camera, "v_offset", 0.0, 0.05).set_delay(0.3)
 
-	if structure_hp <= 0 or torso_hp <= 0:
-		is_dead = true
-		var death_tween = create_tween()
-		death_tween.tween_property(self, "rotation_degrees:z", 85.0, 2.0).set_trans(Tween.TRANS_SINE)
-		death_tween.tween_property(self, "position:y", -2.0, 2.0).set_parallel(true)
+	if is_dead:
+		_play_player_death()
+
+func _on_player_destroyed(_snapshot: Dictionary) -> void:
+	is_dead = true
+
+func _play_player_death() -> void:
+	var death_tween = create_tween()
+	death_tween.tween_property(self, "rotation_degrees:z", 85.0, 2.0).set_trans(Tween.TRANS_SINE)
+	death_tween.tween_property(self, "position:y", -2.0, 2.0).set_parallel(true)
 
 ## How much to speed up time during the bullet's travel phase.
 @export var travel_fast_forward: float = 3.5
@@ -1594,7 +1412,6 @@ func _update_impact_side_camera(_delta: float) -> void:
 			Engine.time_scale = impact_side_camera_time_scale
 			if side_cam_mortar_sound:
 				side_cam_mortar_sound.play()
-			_log_camera_switch("SIDE_CAM_ACTIVATED (dist=%.1fm)" % dist_to_camera_zone)
 		else:
 			Engine.time_scale = travel_fast_forward
 	else:
@@ -1704,14 +1521,11 @@ func _resolve_missed_shot_at_target() -> void:
 	has_missed_shot = true
 	if combat_bark_ui:
 		combat_bark_ui.show_result(false)
-	if target_dossier_ui:
-		target_dossier_ui.show_impact_line("NO DAMAGE", "", _get_current_target_hp_snapshot())
+	if dossier_presenter and dossier_presenter.has_method("show_target_no_damage"):
+		dossier_presenter.show_target_no_damage()
 	var damage_number_script = preload("res://scripts/damage_number.gd")
 	damage_number_script.display_text(target_hit_point, "MISS", get_tree().current_scene, Color.ORANGE_RED)
 	shot_resolved = true
-
-func _fmt_debug_vec(value: Vector3) -> String:
-	return "(%.2f, %.2f, %.2f)" % [value.x, value.y, value.z]
 
 func _get_impact_resolve_linger_time() -> float:
 	if impact_side_camera_active:
@@ -1731,7 +1545,6 @@ func _end_cinematic() -> void:
 	active_shell = null
 	if combat_bark_ui:
 		combat_bark_ui.hide_bark()
-	_log_camera_switch("COCKPIT_RETURN")
 
 func _update_cinematic(delta: float):
 	cinematic_timer += delta
@@ -1743,14 +1556,12 @@ func _update_cinematic(delta: float):
 		# jump to side-view immediately so we don't miss the impact.
 		if shot_resolved:
 			cinematic_phase = 3
-			_log_camera_switch("IMPACT_RESOLVED_LINGER_PREEMPTIVE")
 			_update_impact_side_camera_pose(target_hit_point, _get_impact_side_camera_world_position())
 			cinematic_timer = 0.0
 			return
 
 		if cinematic_timer >= firecam_duration:
 			cinematic_phase = 2
-			_log_camera_switch("PHASE_2_IMPACT_TRACKING_START")
 			# Force an immediate position update so we don't spend a single frame at the muzzle
 			_update_impact_side_camera(0.0)
 			cinematic_timer = 0.0
