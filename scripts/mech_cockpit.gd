@@ -363,6 +363,7 @@ func _setup_combat_view_flow_controller() -> void:
 		"reset_targeting_stroke_callable": Callable(self, "_reset_analog_targeting_stroke"),
 		"set_targeting_drift_callable": Callable(self, "_set_analog_targeting_drift"),
 		"begin_fire_sequence_callable": Callable(self, "_begin_fire_sequence_from_lock"),
+		"is_enemy_fire_cinematic_active_callable": Callable(self, "_is_enemy_fire_cinematic_active"),
 		"state_changed_callable": Callable(self, "_on_combat_view_flow_state_changed")
 	})
 
@@ -753,6 +754,9 @@ func _update_analog_camera_presentation(delta: float) -> void:
 		)
 
 func begin_enemy_fire_cinematic(fire_callable: Callable) -> void:
+	if combat_view_flow_controller:
+		combat_view_flow_controller.reset_to_normal(CombatViewState.NORMAL_VIEW)
+
 	if enemy_fire_cinematic_controller and enemy_fire_cinematic_controller.has_method("begin"):
 		enemy_fire_cinematic_controller.begin(fire_callable, camera, cinematic_camera, is_dead, Callable(self, "_end_cinematic_if_active"))
 	else:

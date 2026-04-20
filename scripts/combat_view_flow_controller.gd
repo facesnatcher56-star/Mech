@@ -24,6 +24,7 @@ var reset_aim_solution_callable: Callable
 var reset_targeting_stroke_callable: Callable
 var set_targeting_drift_callable: Callable
 var begin_fire_sequence_callable: Callable
+var is_enemy_fire_cinematic_active_callable: Callable
 var state_changed_callable: Callable
 
 func configure(config: Dictionary) -> void:
@@ -45,6 +46,7 @@ func configure(config: Dictionary) -> void:
 	reset_targeting_stroke_callable = config.get("reset_targeting_stroke_callable", Callable())
 	set_targeting_drift_callable = config.get("set_targeting_drift_callable", Callable())
 	begin_fire_sequence_callable = config.get("begin_fire_sequence_callable", Callable())
+	is_enemy_fire_cinematic_active_callable = config.get("is_enemy_fire_cinematic_active_callable", Callable())
 	state_changed_callable = config.get("state_changed_callable", Callable())
 
 func get_state() -> Dictionary:
@@ -62,6 +64,9 @@ func sync_plain_gun_camera(cinematic_camera: Camera3D, guncam_fov: float) -> voi
 	cinematic_camera.fov = guncam_fov
 
 func update_analog_camera_presentation(delta: float, cinematic_camera: Camera3D, aim_solution_controller: Node, aim_zoom_blend_speed: float, aim_camera_chunk_jump_amount: float, aim_camera_chunk_settle_speed: float) -> void:
+	if _is_enemy_fire_cinematic_active():
+		return
+
 	var gun_camera = _get_gun_camera()
 	if not gun_camera or not cinematic_camera:
 		return
@@ -252,3 +257,8 @@ func _reset_targeting_stroke() -> void:
 func _set_targeting_drift(multiplier: float) -> void:
 	if set_targeting_drift_callable.is_valid():
 		set_targeting_drift_callable.call(multiplier)
+
+func _is_enemy_fire_cinematic_active() -> bool:
+	if is_enemy_fire_cinematic_active_callable.is_valid():
+		return bool(is_enemy_fire_cinematic_active_callable.call())
+	return false

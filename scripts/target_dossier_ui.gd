@@ -2,7 +2,13 @@ extends Control
 
 enum AnchorCorner { BOTTOM_RIGHT, TOP_LEFT, TOP_RIGHT }
 
+@export_group("Layout Adjustments")
 @export var anchor_corner: AnchorCorner = AnchorCorner.BOTTOM_RIGHT
+@export_range(0.1, 2.0, 0.01) var display_scale: float = 1.0
+@export_range(-1000, 1000, 1) var custom_offset_x: float = 0.0
+@export_range(-1000, 1000, 1) var custom_offset_y: float = 0.0
+
+@export_group("Visuals")
 @export var panel_size: Vector2 = Vector2(210.0, 306.0)
 @export var panel_margin: Vector2 = Vector2(22.0, 22.0)
 @export var background_color: Color = Color(0.015, 0.018, 0.014, 0.92)
@@ -61,12 +67,23 @@ func show_impact_line(text: String, part_key: String = "", new_snapshot: Diction
 func _update_layout() -> void:
 	var viewport_size := get_viewport_rect().size
 	size = panel_size
+	scale = Vector2(display_scale, display_scale)
+	
+	var scaled_size = panel_size * display_scale
+	var base_pos := Vector2.ZERO
+	
 	if anchor_corner == AnchorCorner.TOP_LEFT:
-		position = panel_margin
+		pivot_offset = Vector2.ZERO
+		base_pos = panel_margin
 	elif anchor_corner == AnchorCorner.TOP_RIGHT:
-		position = Vector2(viewport_size.x - panel_size.x - panel_margin.x, panel_margin.y)
+		pivot_offset = Vector2(panel_size.x, 0)
+		base_pos = Vector2(viewport_size.x - panel_size.x, 0)
 	else:
-		position = Vector2(viewport_size.x - panel_size.x - panel_margin.x, viewport_size.y - panel_size.y - panel_margin.y)
+		pivot_offset = panel_size
+		base_pos = Vector2(viewport_size.x - panel_size.x - panel_margin.x, viewport_size.y - panel_size.y - panel_margin.y)
+
+	position = base_pos + Vector2(custom_offset_x, custom_offset_y)
+
 
 func _draw() -> void:
 	var font := get_theme_default_font()
@@ -83,7 +100,6 @@ func _draw() -> void:
 	var status_color := critical_color if destroyed else warn_color
 	draw_string(font, Vector2(14, 20), "TARGET DOSSIER", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, muted_text_color)
 	draw_string(font, Vector2(14, 44), target_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, text_color)
-	draw_string(font, Vector2(panel_size.x - 14, 44), status_text, HORIZONTAL_ALIGNMENT_RIGHT, 110, 13, status_color)
 
 	# Structure bar (thin, under header)
 	var structure: Dictionary = {"current": 100, "max": 100}
@@ -129,7 +145,6 @@ func _draw() -> void:
 		var rl_stat := "READY" if rl_prog >= 0.95 else ("LOADING" if rl_prog < 0.42 else "ALMOST READY")
 		draw_line(Vector2(12, panel_size.y - 56), Vector2(panel_size.x - 12, panel_size.y - 56), border_color.darkened(0.5), 1.0)
 		draw_string(font, Vector2(14, panel_size.y - 46), rl_lbl,  HORIZONTAL_ALIGNMENT_LEFT,  -1,  9, muted_text_color)
-		draw_string(font, Vector2(panel_size.x - 14, panel_size.y - 46), rl_stat, HORIZONTAL_ALIGNMENT_RIGHT, 120, 9, rl_col)
 		var bar_r := Rect2(14, panel_size.y - 39, panel_size.x - 28, 8)
 		draw_rect(bar_r, Color(0.02, 0.025, 0.02, 1.0), true)
 		draw_rect(Rect2(bar_r.position, Vector2(bar_r.size.x * rl_prog, bar_r.size.y)), rl_col, true)

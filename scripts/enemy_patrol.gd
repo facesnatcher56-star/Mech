@@ -2,11 +2,25 @@ extends Node3D
 
 const PROJECTILE = preload("res://scenes/projectile.tscn")
 
+@export_group("Enemy Firing")
+## Seconds between each shot.
+@export var fire_interval: float = 6.0
+## World units per second for enemy shells.
+@export var projectile_speed: float = 80.0
+## Height above the enemy origin to spawn shells (approximates cannon height).
+@export var muzzle_height_offset: float = 6.5
+## Vertical aim offset applied to the player position so shells arc toward the cockpit.
+@export var aim_height_offset: float = 3.0
+## Delay before the first shot so the player has time to settle in.
+@export var initial_fire_delay: float = 4.0
+
 var start_pos: Vector3
 var is_staggered: bool = false
 var stagger_count: int = 0
 var armor: int = 1 # One-hit kill
+var _fire_timer: float = 0.0
 
+@onready var player: Node3D = get_tree().get_first_node_in_group("player")
 @onready var body = get_node_or_null("Body")
 @onready var left_leg = get_node_or_null("Body/LeftLeg")
 @onready var right_leg = get_node_or_null("Body/RightLeg")
@@ -14,6 +28,15 @@ var armor: int = 1 # One-hit kill
 func _ready():
 	add_to_group("enemy")
 	start_pos = position
+	_fire_timer = initial_fire_delay
+
+func _process(delta):
+	if armor <= 0:
+		return
+	_fire_timer -= delta
+	if _fire_timer <= 0.0:
+		_fire_timer = fire_interval
+		fire_at_player()
 
 func _physics_process(delta):
 	if armor <= 0: return
@@ -38,8 +61,30 @@ func _collect_collision_object_rids(node: Node, exclusions: Array[RID]) -> void:
 		_collect_collision_object_rids(child, exclusions)
 
 func fire_at_player():
-	# Firing disabled
-	pass
+	if not is_instance_valid(player):
+		player = get_tree().get_first_node_in_group("player") as Node3D
+	if not is_instance_valid(player):
+		return
+
+	if player.has_method("begin_enemy_fire_cinematic"):
+		player.begin_enemy_fire_cinematic(Callable(self, "_perform_fire"))
+	else:
+		_perform_fire()
+
+func _perform_fire():
+	if not is_instance_valid(player):
+		return
+
+	var muzzle_pos := global_position + Vector3.UP * muzzle_height_offset
+	var aim_pos    := player.global_position + Vector3.UP * aim_height_offset
+
+	var shell := PROJECTILE.instantiate()
+	shell.shooter = self
+	shell.speed = projectile_speed
+	shell.is_player_shot = false
+	get_tree().root.add_child(shell)
+	shell.global_position = muzzle_pos
+	shell.look_at(aim_pos, Vector3.UP)
 
 func hit():
 	# The individual parts will handle their own hits via the projectile

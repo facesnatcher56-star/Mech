@@ -20,6 +20,11 @@ extends Control
 ## Seconds used for fade in and fade out.
 @export var fade_time: float = 0.18
 
+@export_group("Layout Adjustments")
+@export_range(0.1, 2.0, 0.01) var display_scale: float = 0.40
+@export_range(-1000, 1000, 1) var custom_offset_x: float = -22.0
+@export_range(-1000, 1000, 1) var custom_offset_y: float = -24.0
+
 var _hide_timer: SceneTreeTimer = null
 var _fade_tween: Tween = null
 var _reload_remaining: float = 0.0
@@ -42,12 +47,19 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_update_layout)
 
 func _update_layout() -> void:
-	# Scale down and anchor below the player dossier (210x306 panel at scale 0.65, margin 22)
-	var crew_scale := 0.65
-	scale = Vector2(crew_scale, crew_scale)
+	# Base: anchor below the player dossier (210x306 panel at scale 0.65, margin 22)
+	scale = Vector2(display_scale, display_scale)
 	pivot_offset = Vector2.ZERO
-	var dossier_bottom := 22.0 + 306.0 * crew_scale
-	set_position(Vector2(22.0, dossier_bottom + 4.0))
+	
+	# Current player dossier setup is top-left (margin 22) with height 306
+	# We use 0.65 as the default 'standard' scale to calculate the base bottom
+	var base_dossier_scale := 0.65
+	var dossier_bottom := 22.0 + 306.0 * base_dossier_scale
+	
+	var base_x := 22.0
+	var base_y := dossier_bottom + 4.0
+	
+	set_position(Vector2(base_x + custom_offset_x, base_y + custom_offset_y))
 
 func _process(delta: float) -> void:
 	_display_reload_ratio = lerpf(_display_reload_ratio, _reload_ratio, min(1.0, delta * 9.0))

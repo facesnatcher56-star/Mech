@@ -25,13 +25,15 @@ func update_self_status(snapshot: Dictionary, reload_progress: float) -> void:
 	self_dossier_ui.set_snapshot(snap)
 
 func update_enemy_status() -> void:
-	if not enemy_status_ui or not enemy_status_ui.visible:
+	if not enemy_status_ui:
 		return
 	var enemy_snap := get_current_target_hp_snapshot()
 	if not enemy_snap.is_empty():
 		enemy_status_ui.show_dossier(enemy_snap)
 	else:
-		enemy_status_ui.visible = false
+		# Keep it visible but potentially with default/empty data if no enemy found yet
+		# though usually Zezlan is there.
+		pass
 
 func sync_view_visibility(in_normal_view: bool) -> void:
 	if self_dossier_ui:
@@ -106,7 +108,9 @@ func _setup_self_dossier_ui() -> void:
 	self_dossier_ui = TARGET_DOSSIER_UI.new()
 	self_dossier_ui.name = "SelfDossierUI"
 	self_dossier_ui.anchor_corner = TARGET_DOSSIER_UI.AnchorCorner.TOP_LEFT
-	self_dossier_ui.scale = Vector2(0.65, 0.65)
+	self_dossier_ui.display_scale = 0.65
+	self_dossier_ui.custom_offset_x = -21.0
+	self_dossier_ui.custom_offset_y = -21.0
 	canvas_layer.add_child(self_dossier_ui)
 	self_dossier_ui.show_dossier(_get_player_snapshot())
 
@@ -114,7 +118,9 @@ func _setup_enemy_status_ui() -> void:
 	enemy_status_ui = TARGET_DOSSIER_UI.new()
 	enemy_status_ui.name = "EnemyStatusUI"
 	enemy_status_ui.anchor_corner = TARGET_DOSSIER_UI.AnchorCorner.TOP_RIGHT
-	enemy_status_ui.scale = Vector2(0.65, 0.65)
+	enemy_status_ui.display_scale = 0.65
+	enemy_status_ui.custom_offset_x = 0.0
+	enemy_status_ui.custom_offset_y = 0.0
 	canvas_layer.add_child(enemy_status_ui)
 	enemy_status_ui.visible = false
 

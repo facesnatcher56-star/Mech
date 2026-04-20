@@ -18,6 +18,7 @@
 [ext_resource type="Script" uid="uid://btwpt6uwt6me4" path="res://scripts/zezlan_movement_controller.gd" id="20_zezlan_movement"]
 [ext_resource type="Script" uid="uid://cthmffaqbefjg" path="res://scripts/crew_soldier.gd" id="21_crew_soldier"]
 [ext_resource type="Script" uid="uid://c0y2se45h5trx" path="res://scripts/crew_order_ui.gd" id="22_crew_order_ui"]
+[ext_resource type="Script" uid="uid://ci0g6b45ktuvb" path="res://scripts/firing_sequence_camera.gd" id="23_firing_seq_cam"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_ref"]
 radius = 0.1
@@ -34,12 +35,12 @@ material = SubResource("StandardMaterial3D_aim_target")
 radius = 0.65
 height = 1.3
 
-[sub_resource type="Gradient" id="Gradient_dp3eg"]
+[sub_resource type="Gradient" id="Gradient_0ld40"]
 offsets = PackedFloat32Array(0, 0.1, 0.5, 1, 1)
 colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.114, 1, 1, 1, 0.0798, 1, 1, 1, 1, 1, 1, 1, 0)
 
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_0ld40"]
-gradient = SubResource("Gradient_dp3eg")
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_gqmmt"]
+gradient = SubResource("Gradient_0ld40")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_a8y0u"]
 direction = Vector3(-1, 10, 0)
@@ -51,9 +52,9 @@ damping_min = 4.0
 damping_max = 6.0
 scale_min = 1.5
 scale_max = 3.0
-color_ramp = SubResource("GradientTexture1D_0ld40")
+color_ramp = SubResource("GradientTexture1D_gqmmt")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gqmmt"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_yc10j"]
 transparency = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true
@@ -64,7 +65,7 @@ particles_anim_v_frames = 1
 particles_anim_loop = false
 
 [sub_resource type="QuadMesh" id="QuadMesh_smoke"]
-material = SubResource("StandardMaterial3D_gqmmt")
+material = SubResource("StandardMaterial3D_yc10j")
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_leg"]
 size = Vector3(0.25, 0.8, 0.25)
@@ -489,6 +490,7 @@ libraries/ = SubResource("AnimationLibrary_gqmmt")
 
 [node name="FiringSequenceCam" type="Camera3D" parent="." unique_id=3000012]
 transform = Transform3D(-0.4257003, 0, -0.9048642, 0, 1, 0, 0.9048642, 0, -0.4257003, 30.719206, 3.2339597, 150.19206)
+script = ExtResource("23_firing_seq_cam")
 
 [node name="SideCamLeft" type="Marker3D" parent="." unique_id=39001302 groups=["side_cam_left"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.793173, 5, 127.393265)

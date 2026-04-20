@@ -282,8 +282,13 @@ func _process(delta: float) -> void:
 	_update_animation(delta)
 	_update_fire_timer(delta)
 
-func _update_fire_timer(_delta: float) -> void:
-	pass  # firing disabled
+func _update_fire_timer(delta: float) -> void:
+	if is_destroyed:
+		return
+	_fire_timer -= delta
+	if _fire_timer <= 0.0:
+		_fire_timer = fire_interval
+		_fire_at_player()
 
 func _fire_at_player() -> void:
 	var player := get_tree().get_first_node_in_group("player") as Node3D

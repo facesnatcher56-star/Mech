@@ -1,5 +1,11 @@
 extends Node
 
+@export_group("Cinematic Timing")
+## Time to hold on the enemy camera before firing.
+@export var pre_fire_hold: float = 2.0
+## Time to hold on the enemy camera after firing before returning to the player.
+@export var post_fire_hold: float = 1.0
+
 var active: bool = false
 
 func begin(fire_callable: Callable, player_camera: Camera3D, cinematic_camera: Camera3D, player_is_dead: bool, interrupt_callable: Callable) -> void:
@@ -22,9 +28,17 @@ func begin(fire_callable: Callable, player_camera: Camera3D, cinematic_camera: C
 		cinematic_camera.current = false
 	enemy_cam.current = true
 
-	get_tree().create_timer(2.0).timeout.connect(func():
+	var pre_hold = pre_fire_hold
+	var post_hold = post_fire_hold
+
+	if enemy_cam.get("pre_fire_hold") != null:
+		pre_hold = enemy_cam.pre_fire_hold
+	if enemy_cam.get("post_fire_hold") != null:
+		post_hold = enemy_cam.post_fire_hold
+
+	get_tree().create_timer(pre_hold).timeout.connect(func():
 		fire_callable.call()
-		get_tree().create_timer(2.0).timeout.connect(func():
+		get_tree().create_timer(post_hold).timeout.connect(func():
 			enemy_cam.current = false
 			if player_camera:
 				player_camera.current = true
