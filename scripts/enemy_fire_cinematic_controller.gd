@@ -16,6 +16,11 @@ extends Node
 ## FOV for the action cameras.
 @export var action_fov: float = 65.0
 
+@export_group("Cameras")
+@export var firing_sequence_cam: Camera3D
+@export var action_cam_a: Camera3D
+@export var action_cam_b: Camera3D
+
 var active: bool = false
 var phase: int = 0 # 0: idle, 1: firing, 2: tracking, 3: linger
 var active_shell: Node3D = null
@@ -32,7 +37,7 @@ func begin(fire_callable: Callable, player_camera: Camera3D, cinematic_camera: C
 		fire_callable.call()
 		return
 
-	var enemy_cam := _find_scene_camera("FiringSequenceCam")
+	var enemy_cam := firing_sequence_cam
 	if not enemy_cam:
 		fire_callable.call()
 		return
@@ -74,9 +79,9 @@ func set_active_shell(shell: Node3D, impact_pos: Vector3) -> void:
 		shot_muzzle_pos = active_shell.global_position
 
 func _transition_to_action_cam() -> void:
-	var cam_a = _find_scene_camera("ActionCamA")
-	var cam_b = _find_scene_camera("ActionCamB")
-	
+	var cam_a = action_cam_a
+	var cam_b = action_cam_b
+
 	if not cam_a and not cam_b:
 		end()
 		return
@@ -135,8 +140,8 @@ func end() -> void:
 	Engine.time_scale = 1.0
 	if selected_action_cam:
 		selected_action_cam.current = false
-	if _find_scene_camera("FiringSequenceCam"):
-		_find_scene_camera("FiringSequenceCam").current = false
+	if firing_sequence_cam:
+		firing_sequence_cam.current = false
 	
 	if _saved_player_cam:
 		_saved_player_cam.current = true
@@ -147,11 +152,3 @@ func end() -> void:
 func is_active() -> bool:
 	return active
 
-func _find_scene_camera(cam_name: String) -> Camera3D:
-	var tree := get_tree()
-	if not tree:
-		return null
-	var scene := tree.current_scene
-	if scene:
-		return scene.find_child(cam_name, true, false) as Camera3D
-	return null
