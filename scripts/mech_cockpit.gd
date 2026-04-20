@@ -2,7 +2,6 @@ extends Node3D
 
 var camera: Camera3D = null
 @onready var cockpit_mesh = self
-const PROJECTILE = preload("res://scenes/projectile.tscn")
 const DEFAULT_ANALOG_HEARTBEAT = preload("res://assets/Sounds/heartbeats-61.wav")
 const PLAYER_DAMAGE_MODEL = preload("res://scripts/player_damage_model.gd")
 const COMBAT_DOSSIER_PRESENTER = preload("res://scripts/combat_dossier_presenter.gd")
@@ -12,6 +11,7 @@ const ENEMY_FIRE_CINEMATIC_CONTROLLER = preload("res://scripts/enemy_fire_cinema
 const PROJECTILE_CINEMATIC_CONTROLLER = preload("res://scripts/projectile_cinematic_controller.gd")
 const ANALOG_AIM_SOLUTION_CONTROLLER = preload("res://scripts/analog_aim_solution_controller.gd")
 const ANALOG_TARGETING_CONTROLLER = preload("res://scripts/analog_targeting_controller.gd")
+const PLAYER_FIRE_CONTROLLER = preload("res://scripts/player_fire_controller.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -194,10 +194,9 @@ var enemy_fire_cinematic_controller: Node = null
 var projectile_cinematic_controller: Node = null
 var analog_aim_solution_controller: Node = null
 var analog_targeting_controller: Node = null
+var player_fire_controller: Node = null
 
 # --- RECOIL TRACKING ---
-var recoil_tween: Tween
-var visual_barrel_base_pos: Vector3
 
 func _ready():
 	add_to_group("player")
@@ -218,6 +217,7 @@ func _ready():
 	_setup_analog_heartbeat_controller()
 	get_tree().root.call_deferred("add_child", cinematic_camera)
 	_setup_projectile_cinematic_controller()
+	_setup_player_fire_controller()
 	call_deferred("_setup_dossier_presenter")
 
 func _setup_analog_heartbeat_controller() -> void:
@@ -321,6 +321,7 @@ func _setup_dossier_presenter() -> void:
 	dossier_presenter.name = "CombatDossierPresenter"
 	add_child(dossier_presenter)
 	dossier_presenter.configure(self, canvas_layer)
+	_refresh_player_fire_controller()
 
 func _setup_player_damage_model() -> void:
 	player_damage_model = PLAYER_DAMAGE_MODEL.new()
@@ -389,6 +390,45 @@ func _setup_projectile_cinematic_controller() -> void:
 		"travel_fast_forward": travel_fast_forward
 	})
 
+func _setup_player_fire_controller() -> void:
+	player_fire_controller = PLAYER_FIRE_CONTROLLER.new()
+	player_fire_controller.name = "PlayerFireController"
+	add_child(player_fire_controller)
+	player_fire_controller.configure({
+		"cockpit": self,
+		"intersect_target_ray_callable": Callable(self, "_intersect_target_ray"),
+		"is_enemy_collider_callable": Callable(self, "_is_enemy_collider"),
+		"get_target_node_callable": Callable(self, "_get_analog_target_node"),
+		"get_enemy_aim_root_callable": Callable(self, "_get_enemy_aim_root"),
+		"apply_enemy_damage_callable": Callable(self, "_apply_enemy_damage"),
+		"get_fire_camera_callable": Callable(self, "_get_fire_camera_marker"),
+		"on_reload_started_callable": Callable(self, "_start_weapon_reload"),
+		"projectile_cinematic_controller": projectile_cinematic_controller,
+		"combat_bark_ui": combat_bark_ui,
+		"dossier_presenter": dossier_presenter,
+		"cannon_sound": cannon_sound,
+		"hit_sound": hit_sound,
+		"visual_barrel": visual_barrel,
+		"muzzle": muzzle,
+		"projectile_speed": projectile_speed,
+		"bullet_slomo": bullet_slomo
+	})
+
+func _refresh_player_fire_controller() -> void:
+	if not player_fire_controller:
+		return
+	player_fire_controller.refresh_runtime_refs({
+		"projectile_cinematic_controller": projectile_cinematic_controller,
+		"combat_bark_ui": combat_bark_ui,
+		"dossier_presenter": dossier_presenter,
+		"cannon_sound": cannon_sound,
+		"hit_sound": hit_sound,
+		"visual_barrel": visual_barrel,
+		"muzzle": muzzle,
+		"projectile_speed": projectile_speed,
+		"bullet_slomo": bullet_slomo
+	})
+
 func get_hp_snapshot() -> Dictionary:
 	if player_damage_model and player_damage_model.has_method("get_hp_snapshot"):
 		return player_damage_model.get_hp_snapshot()
@@ -424,6 +464,7 @@ func _setup_big_gun():
 		muzzle = visual_barrel.get_node_or_null("Muzzle")
 		if not muzzle:
 			push_warning("MechCockpit: Muzzle marker not found under RightArm — projectile spawn will be wrong.")
+	_refresh_player_fire_controller()
 
 func _input(event):
 	if is_dead: return
@@ -886,28 +927,10 @@ func _begin_fire_sequence_from_lock(shot_lock: Dictionary) -> void:
 	)
 
 func _build_shot_lock(source_camera: Camera3D) -> Dictionary:
-	var final_dir = -source_camera.global_transform.basis.z
-	var result = _intersect_target_ray(source_camera, 500.0)
-
-	var will_hit_enemy = false
-	var impact_anchor: Node3D = _get_analog_target_node()
-	var focal_range = current_target_range if current_target_range > 0 else 100.0
-	var focal_point = source_camera.global_position + (final_dir * focal_range)
-	var target_point = source_camera.global_position + (final_dir * 500.0)
-	if result and result.collider:
-		target_point = result.position
-		if _is_enemy_collider(result.collider):
-			will_hit_enemy = true
-			focal_point = target_point
-			if result.collider is Node3D:
-				impact_anchor = _get_enemy_aim_root(result.collider as Node3D)
-
-	return {
-		"target_point": target_point,
-		"focal_point": focal_point,
-		"will_hit_enemy": will_hit_enemy,
-		"impact_anchor": impact_anchor
-	}
+	_refresh_player_fire_controller()
+	if player_fire_controller:
+		return player_fire_controller.build_shot_lock(source_camera, current_target_range)
+	return {}
 
 ## Slomo scale while watching the gun cam/firing.
 @export var bullet_slomo: float = 0.2
@@ -916,92 +939,14 @@ func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool, focal_poi
 	combat_view_state = CombatViewState.FIRING_FROM_FIRE_CAM
 	_set_analog_hud_visible(false)
 	_stop_analog_heartbeat()
+	_refresh_player_fire_controller()
+	if player_fire_controller:
+		player_fire_controller.perform_actual_shot(target_point, will_hit_enemy, focal_point, impact_anchor)
 
-	if combat_bark_ui:
-		combat_bark_ui.show_commit()
-
-	# Apply bullet slomo
-	Engine.time_scale = bullet_slomo
-
-	if cannon_sound:
-		cannon_sound.play()
-
-	# Trigger Smoke
-	var smoke = find_child("MuzzleSmoke", true)
-	if smoke:
-		smoke.restart()
-
-	var dir_smoke = find_child("DirectionalSmoke", true)
-	if dir_smoke:
-		if dir_smoke.has_method("fire"):
-			dir_smoke.fire()
-
+func _start_weapon_reload() -> void:
 	is_reloading = true
 	reload_timer = 0.0
-
-	# Snapshot the dedicated firing camera at this exact moment so it remains STATIONARY during recoil
-	var fire_camera = _get_fire_camera_marker()
-	if projectile_cinematic_controller and projectile_cinematic_controller.has_method("begin_fire_cam"):
-		projectile_cinematic_controller.begin_fire_cam(fire_camera, muzzle.global_position, focal_point, will_hit_enemy, impact_anchor)
-
-	var shell = PROJECTILE.instantiate()
-	shell.shooter = self
-	shell.is_player_shot = true
-	shell.is_destined_for_hit = will_hit_enemy
-	shell.speed = projectile_speed
-
-	shell.has_hit.connect(func(body, hit_pos):
-		if projectile_cinematic_controller and projectile_cinematic_controller.has_method("is_shot_resolved") and projectile_cinematic_controller.is_shot_resolved():
-			return
-
-		if projectile_cinematic_controller and projectile_cinematic_controller.has_method("mark_shell_hit"):
-			projectile_cinematic_controller.mark_shell_hit(hit_pos)
-		var is_enemy = _is_enemy_collider(body)
-		var damage_result: Dictionary = {}
-		var bark_part_name := ""
-		if is_enemy:
-			bark_part_name = body.name
-			damage_result = _apply_enemy_damage(body, hit_pos)
-			if not damage_result.is_empty() and str(damage_result.get("part_key", "")) != "":
-				bark_part_name = str(damage_result.get("part_key", ""))
-		if combat_bark_ui:
-			combat_bark_ui.show_result(is_enemy, bark_part_name if is_enemy else "")
-
-			if not is_enemy:
-				var should_show_miss := true
-				if projectile_cinematic_controller and projectile_cinematic_controller.has_method("mark_direct_miss"):
-					should_show_miss = projectile_cinematic_controller.mark_direct_miss(hit_pos)
-				if not should_show_miss:
-					return
-				if dossier_presenter and dossier_presenter.has_method("show_target_no_damage"):
-					dossier_presenter.show_target_no_damage()
-				var damage_number_script = preload("res://scripts/damage_number.gd")
-				damage_number_script.display_text(hit_pos, "MISS", get_tree().current_scene, Color.ORANGE_RED)
-		elif is_enemy:
-			if hit_sound:
-				hit_sound.global_position = hit_pos
-				hit_sound.play()
-	)
-
-	get_tree().root.add_child(shell)
-
-	# Spawn at muzzle position
-	shell.global_position = muzzle.global_position
-
-	shell.look_at(target_point, Vector3.UP)
-	if projectile_cinematic_controller and projectile_cinematic_controller.has_method("set_active_shell"):
-		projectile_cinematic_controller.set_active_shell(shell)
-
 	current_spread = max_spread
-	recoil_tween = create_tween()
-	visual_barrel_base_pos = visual_barrel.position
-
-	# Recoil opposite to muzzle direction
-	var recoil_vector = visual_barrel.transform.basis * (-muzzle.position.normalized() * 0.5)
-
-	recoil_tween.tween_property(visual_barrel, "position", visual_barrel_base_pos + recoil_vector, 0.05).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	recoil_tween.tween_property(visual_barrel, "position", visual_barrel_base_pos, 0.18).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
-
 
 func hit():
 	if is_dead:
