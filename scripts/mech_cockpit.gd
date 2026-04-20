@@ -10,6 +10,7 @@ const MAIN_CAMERA_CONTROLLER = preload("res://scripts/main_camera_controller.gd"
 const ANALOG_HEARTBEAT_CONTROLLER = preload("res://scripts/analog_heartbeat_controller.gd")
 const ENEMY_FIRE_CINEMATIC_CONTROLLER = preload("res://scripts/enemy_fire_cinematic_controller.gd")
 const PROJECTILE_CINEMATIC_CONTROLLER = preload("res://scripts/projectile_cinematic_controller.gd")
+const ANALOG_AIM_SOLUTION_CONTROLLER = preload("res://scripts/analog_aim_solution_controller.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -178,15 +179,7 @@ var hit_sound: AudioStreamPlayer3D = null
 @export var analog_heartbeat_pitch_scale: float = 1.0
 
 var cinematic_camera: Camera3D
-var aim_settle: float = 0.09
-var hit_chance: float = 0.0
-var fire_recovery: float = 0.0
-var aim_zoom_stage: int = 1
-var aim_solution_stage: int = 1
-var aim_camera_stage_elapsed: float = 0.0
 var current_analog_drift_multiplier: float = 1.0
-var aim_stage_bump_timer: float = 0.0
-var smooth_max_accuracy: float = 0.7
 var combat_view_state: int = CombatViewState.NORMAL_VIEW
 var view_transition_tween: Tween
 var analog_sway_rng := RandomNumberGenerator.new()
@@ -205,6 +198,7 @@ var main_camera_controller: Node = null
 var analog_heartbeat_controller: Node = null
 var enemy_fire_cinematic_controller: Node = null
 var projectile_cinematic_controller: Node = null
+var analog_aim_solution_controller: Node = null
 
 # --- RECOIL TRACKING ---
 var recoil_tween: Tween
@@ -218,6 +212,7 @@ func _ready():
 	_setup_player_damage_model()
 	_setup_main_camera_controller()
 	_setup_enemy_fire_cinematic_controller()
+	_setup_analog_aim_solution_controller()
 	hit_sound = _find_audio_player_3d("HitSound")
 	_set_analog_hud_visible(false)
 
@@ -241,6 +236,58 @@ func _setup_analog_heartbeat_controller() -> void:
 		analog_heartbeat_pitch_scale,
 		Callable(self, "_should_loop_analog_heartbeat")
 	)
+
+func _setup_analog_aim_solution_controller() -> void:
+	analog_aim_solution_controller = ANALOG_AIM_SOLUTION_CONTROLLER.new()
+	analog_aim_solution_controller.name = "AnalogAimSolutionController"
+	add_child(analog_aim_solution_controller)
+	analog_aim_solution_controller.configure({
+		"aim_settle_speed": aim_settle_speed,
+		"post_fire_solution_penalty": post_fire_solution_penalty,
+		"post_fire_recovery_time": post_fire_recovery_time,
+		"accuracy_slowdown_power": accuracy_slowdown_power,
+		"short_range_max": short_range_max,
+		"medium_range_max": medium_range_max,
+		"minimum_max_hit_chance": minimum_max_hit_chance,
+		"short_max_hit_chance": short_max_hit_chance,
+		"medium_max_hit_chance": medium_max_hit_chance,
+		"long_max_hit_chance": long_max_hit_chance,
+		"stage_thresholds": [
+			0.0,
+			aim_solution_stage_2_threshold,
+			aim_solution_stage_3_threshold,
+			aim_solution_stage_4_threshold,
+			aim_solution_stage_5_threshold
+		],
+		"camera_stage_times": [
+			aim_camera_stage_1_time,
+			aim_camera_stage_2_time,
+			aim_camera_stage_3_time,
+			aim_camera_stage_4_time,
+			0.0
+		],
+		"stage_fovs": [
+			aim_stage_1_fov,
+			aim_stage_2_fov,
+			aim_stage_3_fov,
+			aim_stage_4_fov,
+			aim_stage_5_fov
+		],
+		"drift_multipliers": [
+			stage_1_drift_multiplier,
+			stage_2_drift_multiplier,
+			stage_3_drift_multiplier,
+			stage_4_drift_multiplier,
+			stage_5_drift_multiplier
+		],
+		"stroke_speed_multipliers": [
+			stage_1_stroke_speed_multiplier,
+			stage_2_stroke_speed_multiplier,
+			stage_3_stroke_speed_multiplier,
+			stage_4_stroke_speed_multiplier,
+			stage_5_stroke_speed_multiplier
+		]
+	})
 
 func _should_loop_analog_heartbeat() -> bool:
 	return combat_view_state == CombatViewState.ANALOG_AIM_VIEW
@@ -491,32 +538,13 @@ func _update_analog_aim(delta: float) -> void:
 		current_target_range = cinematic_camera.global_position.distance_to(target_point)
 		is_on_target = not last_ray_result.is_empty() and last_ray_result.has("collider") and _is_enemy_collider(last_ray_result.collider)
 
-	if fire_recovery > 0.0:
-		fire_recovery = max(0.0, fire_recovery - delta)
+	if not analog_aim_solution_controller:
+		return
 
-	# Calculate current UI progress (0.0 to 1.0)
-	var current_curve = 1.0 - pow(1.0 - aim_settle, accuracy_slowdown_power)
-	var effective_speed = aim_settle_speed
-
-	# Start slowing down once we pass 50% hit chance
-	if current_curve > 0.5:
-		var factor = clampf(remap(current_curve, 0.5, 1.0, 1.0, 0.0), 0.0, 1.0)
-		effective_speed *= (0.05 + 0.95 * pow(factor, 2.0))
-
-	aim_settle = min(1.0, aim_settle + effective_speed * delta)
-
-	_update_aim_solution_stage()
-	_update_aim_camera_stage(delta)
-	if aim_stage_bump_timer > 0.0:
-		aim_stage_bump_timer = max(0.0, aim_stage_bump_timer - delta)
-
-	var max_accuracy = _get_max_accuracy_for_range(current_target_range)
-	# Smoothly transition max accuracy to prevent jumps when range bands change
-	smooth_max_accuracy = lerpf(smooth_max_accuracy, max_accuracy, delta * 2.5)
-	hit_chance = _calculate_displayed_hit_chance(smooth_max_accuracy)
+	var display = analog_aim_solution_controller.update(delta, current_target_range)
 
 	if analog_reticle_hud:
-		analog_reticle_hud.set_solution(hit_chance, _get_range_band(current_target_range), true)
+		analog_reticle_hud.set_solution(float(display["hit_chance"]), str(display["range_band"]), true)
 
 func _get_aim_query_camera() -> Camera3D:
 	if combat_view_state != CombatViewState.NORMAL_VIEW and cinematic_camera:
@@ -637,20 +665,23 @@ func _update_analog_camera_presentation(delta: float) -> void:
 	var target_point = _get_analog_target_point()
 	var camera_target_point = aim_camera_session_target if aim_camera_session_target != Vector3.ZERO else _get_analog_camera_target_point()
 	var progress = 0.0
+	var zoom_stage := 1
+	if analog_aim_solution_controller:
+		zoom_stage = analog_aim_solution_controller.get_zoom_stage()
 
 	if camera_target_point != Vector3.ZERO:
-		progress = clampf(float(aim_zoom_stage) / 5.0, 0.0, 1.0)
+		progress = clampf(float(zoom_stage) / 5.0, 0.0, 1.0)
 		target_pos = start_pos.lerp(camera_target_point, progress)
 
-	if aim_camera_chunk_stage != aim_zoom_stage:
-		aim_camera_chunk_stage = aim_zoom_stage
+	if aim_camera_chunk_stage != zoom_stage:
+		aim_camera_chunk_stage = zoom_stage
 		cinematic_camera.global_position = cinematic_camera.global_position.lerp(target_pos, aim_camera_chunk_jump_amount)
 
 	cinematic_camera.global_position = cinematic_camera.global_position.lerp(target_pos, clampf(aim_camera_chunk_settle_speed * delta, 0.0, 1.0))
 
-	# Blend the FOV and Drift Multiplier
-	cinematic_camera.fov = lerpf(cinematic_camera.fov, _get_aim_stage_fov(), aim_zoom_blend_speed * delta)
-	current_analog_drift_multiplier = lerpf(current_analog_drift_multiplier, _get_aim_stage_drift_multiplier(), aim_zoom_blend_speed * delta)
+	if analog_aim_solution_controller:
+		cinematic_camera.fov = lerpf(cinematic_camera.fov, analog_aim_solution_controller.get_stage_fov(), aim_zoom_blend_speed * delta)
+		current_analog_drift_multiplier = lerpf(current_analog_drift_multiplier, analog_aim_solution_controller.get_stage_drift_multiplier(), aim_zoom_blend_speed * delta)
 
 	# Point at the drifted target point
 	if target_point != Vector3.ZERO:
@@ -720,12 +751,10 @@ func _enter_analog_aim_view() -> void:
 	var gun_camera = _get_gun_camera_marker()
 	aim_camera_session_start = gun_camera.global_position if gun_camera else cinematic_camera.global_position
 	aim_camera_session_target = _get_analog_camera_target_point()
-	aim_zoom_stage = 1
-	aim_solution_stage = 1
-	aim_camera_stage_elapsed = 0.0
 	aim_camera_chunk_stage = 0
-	_update_aim_solution_stage()
-	current_analog_drift_multiplier = _get_aim_stage_drift_multiplier()
+	if analog_aim_solution_controller:
+		analog_aim_solution_controller.reset_for_aim()
+		current_analog_drift_multiplier = analog_aim_solution_controller.get_stage_drift_multiplier()
 	analog_stroke_active = false
 	analog_stroke_target = null
 
@@ -929,7 +958,9 @@ func _append_aabb_corners(points: Array, xform: Transform3D, aabb: AABB) -> void
 				points.append(xform * (origin + Vector3(size.x * x, size.y * y, size.z * z)))
 
 func _begin_analog_correction_stroke(frame: Dictionary, target: Node3D) -> void:
-	var quality = clampf(aim_settle, 0.0, 1.0)
+	var quality = 0.0
+	if analog_aim_solution_controller:
+		quality = analog_aim_solution_controller.get_quality()
 	var crossing = _pick_frame_crossing_point(frame, quality)
 	var angle = analog_sway_rng.randf_range(0.0, TAU)
 	var direction = Vector2(cos(angle), sin(angle)).normalized()
@@ -946,7 +977,10 @@ func _begin_analog_correction_stroke(frame: Dictionary, target: Node3D) -> void:
 	var end_exit = _get_frame_exit_distance(crossing, direction, frame)
 	analog_stroke_end = crossing + direction * (end_exit + _get_analog_stroke_overshoot(frame, quality))
 	var base_duration = lerpf(analog_low_accuracy_stroke_duration, analog_high_accuracy_stroke_duration, quality)
-	analog_stroke_duration = base_duration / max(0.05, _get_stage_stroke_speed_multiplier())
+	var stroke_speed_multiplier = 1.0
+	if analog_aim_solution_controller:
+		stroke_speed_multiplier = analog_aim_solution_controller.get_stage_stroke_speed_multiplier()
+	analog_stroke_duration = base_duration / max(0.05, stroke_speed_multiplier)
 	analog_stroke_time = 0.0
 	analog_stroke_target = target
 	analog_stroke_active = true
@@ -984,14 +1018,6 @@ func _get_analog_stroke_overshoot(frame: Dictionary, quality: float) -> float:
 	var overshoot = frame_radius * overshoot_scale * stage_scale
 	return clampf(overshoot, analog_visible_frame_min_padding, analog_max_distance_from_frame)
 
-func _get_stage_stroke_speed_multiplier() -> float:
-	match aim_solution_stage:
-		5: return stage_5_stroke_speed_multiplier
-		4: return stage_4_stroke_speed_multiplier
-		3: return stage_3_stroke_speed_multiplier
-		2: return stage_2_stroke_speed_multiplier
-		_: return stage_1_stroke_speed_multiplier
-
 func _get_frame_exit_distance(point: Vector2, direction: Vector2, frame: Dictionary) -> float:
 	var min_offset = frame["min"]
 	var max_offset = frame["max"]
@@ -1016,85 +1042,13 @@ func _is_offset_outside_frame(offset: Vector2, frame: Dictionary) -> bool:
 func _is_unit_stable() -> bool:
 	return not is_reloading
 
-func _get_range_band(range_m: float) -> String:
-	if range_m <= short_range_max:
-		return "SHORT"
-	if range_m <= medium_range_max:
-		return "MEDIUM"
-	return "LONG"
-
-func _get_max_accuracy_for_range(range_m: float) -> float:
-	var range_max := long_max_hit_chance
-	match _get_range_band(range_m):
-		"SHORT":
-			range_max = short_max_hit_chance
-		"MEDIUM":
-			range_max = medium_max_hit_chance
-	return max(range_max, minimum_max_hit_chance)
-
-func _calculate_displayed_hit_chance(max_accuracy: float) -> float:
-	var settle_curve = 1.0 - pow(1.0 - clampf(aim_settle, 0.0, 1.0), accuracy_slowdown_power)
-	return max_accuracy * settle_curve
-
-func _update_aim_solution_stage() -> void:
-	var next_stage = 1
-	if aim_settle >= aim_solution_stage_5_threshold:
-		next_stage = 5
-	elif aim_settle >= aim_solution_stage_4_threshold:
-		next_stage = 4
-	elif aim_settle >= aim_solution_stage_3_threshold:
-		next_stage = 3
-	elif aim_settle >= aim_solution_stage_2_threshold:
-		next_stage = 2
-
-	if next_stage != aim_solution_stage:
-		aim_solution_stage = next_stage
-		aim_stage_bump_timer = 0.12
-
-func _update_aim_camera_stage(delta: float) -> void:
-	if aim_zoom_stage >= 5:
-		return
-	aim_camera_stage_elapsed += delta
-	var stage_interval = max(0.01, _get_aim_camera_stage_time(aim_zoom_stage))
-	while aim_camera_stage_elapsed >= stage_interval and aim_zoom_stage < 5:
-		aim_camera_stage_elapsed -= stage_interval
-		aim_zoom_stage += 1
-		stage_interval = max(0.01, _get_aim_camera_stage_time(aim_zoom_stage))
-
-func _get_aim_camera_stage_time(stage: int) -> float:
-	match stage:
-		1: return aim_camera_stage_1_time
-		2: return aim_camera_stage_2_time
-		3: return aim_camera_stage_3_time
-		4: return aim_camera_stage_4_time
-		_: return 0.0
-
-func _get_aim_stage_fov() -> float:
-	match aim_zoom_stage:
-		5: return aim_stage_5_fov
-		4: return aim_stage_4_fov
-		3: return aim_stage_3_fov
-		2: return aim_stage_2_fov
-		_: return aim_stage_1_fov
-
-func _get_aim_stage_drift_multiplier() -> float:
-	match aim_solution_stage:
-		5: return stage_5_drift_multiplier
-		4: return stage_4_drift_multiplier
-		3: return stage_3_drift_multiplier
-		2: return stage_2_drift_multiplier
-		_: return stage_1_drift_multiplier
-
 func _disrupt_aim_after_fire() -> void:
-	aim_settle = max(0.09, aim_settle - post_fire_solution_penalty)
-	_update_aim_solution_stage()
-	fire_recovery = post_fire_recovery_time
-
-	var max_accuracy = _get_max_accuracy_for_range(current_target_range)
-	hit_chance = _calculate_displayed_hit_chance(max_accuracy)
+	if not analog_aim_solution_controller:
+		return
+	var display = analog_aim_solution_controller.disrupt_after_fire(current_target_range)
 
 	if analog_reticle_hud:
-		analog_reticle_hud.set_solution(hit_chance, _get_range_band(current_target_range), true)
+		analog_reticle_hud.set_solution(float(display["hit_chance"]), str(display["range_band"]), true)
 
 @export_group("Cinematic Transition")
 ## How long the camera takes to fly from cockpit to gun.
