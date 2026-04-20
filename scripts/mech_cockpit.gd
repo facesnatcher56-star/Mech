@@ -354,6 +354,14 @@ func _setup_combat_view_flow_controller() -> void:
 	combat_view_flow_controller.fire_sequence_requested.connect(_begin_fire_sequence_from_lock)
 
 func _finalize_combat_view_flow_refs() -> void:
+	if enemy_fire_cinematic_controller and enemy_fire_cinematic_controller.has_method("configure_cameras"):
+		var scene := get_tree().current_scene
+		enemy_fire_cinematic_controller.configure_cameras(
+			scene.find_child("FiringSequenceCam", true, false) as Camera3D,
+			scene.find_child("ActionCamA", true, false) as Camera3D,
+			scene.find_child("ActionCamB", true, false) as Camera3D
+		)
+
 	if not combat_view_flow_controller:
 		return
 	combat_view_flow_controller.set_runtime_refs({

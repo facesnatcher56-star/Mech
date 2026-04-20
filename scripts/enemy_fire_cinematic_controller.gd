@@ -21,6 +21,14 @@ extends Node
 @export var action_cam_a: Camera3D
 @export var action_cam_b: Camera3D
 
+func configure_cameras(firing_cam: Camera3D, cam_a: Camera3D, cam_b: Camera3D) -> void:
+	if firing_cam:
+		firing_sequence_cam = firing_cam
+	if cam_a:
+		action_cam_a = cam_a
+	if cam_b:
+		action_cam_b = cam_b
+
 var active: bool = false
 var phase: int = 0 # 0: idle, 1: firing, 2: tracking, 3: linger
 var active_shell: Node3D = null
