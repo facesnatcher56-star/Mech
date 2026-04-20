@@ -6,6 +6,9 @@ const PROJECTILE = preload("res://scenes/projectile.tscn")
 const DEFAULT_ANALOG_HEARTBEAT = preload("res://assets/Sounds/heartbeats-61.wav")
 const PLAYER_DAMAGE_MODEL = preload("res://scripts/player_damage_model.gd")
 const COMBAT_DOSSIER_PRESENTER = preload("res://scripts/combat_dossier_presenter.gd")
+const MAIN_CAMERA_CONTROLLER = preload("res://scripts/main_camera_controller.gd")
+const ANALOG_HEARTBEAT_CONTROLLER = preload("res://scripts/analog_heartbeat_controller.gd")
+const ENEMY_FIRE_CINEMATIC_CONTROLLER = preload("res://scripts/enemy_fire_cinematic_controller.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -205,12 +208,11 @@ var analog_stroke_target: Node3D = null
 var aim_camera_session_start: Vector3 = Vector3.ZERO
 var aim_camera_session_target: Vector3 = Vector3.ZERO
 var aim_camera_chunk_stage: int = 0
-var analog_heartbeat_player: AudioStreamPlayer
 var player_damage_model: Node = null
 var dossier_presenter: Node = null
-var enemy_fire_cinematic_active: bool = false
-var main_camera_orbit_yaw: float = 0.0
-var main_camera_orbit_pitch: float = 0.0
+var main_camera_controller: Node = null
+var analog_heartbeat_controller: Node = null
+var enemy_fire_cinematic_controller: Node = null
 
 # --- RECOIL TRACKING ---
 var recoil_tween: Tween
@@ -222,13 +224,8 @@ func _ready():
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 	_setup_player_damage_model()
-	camera = _find_main_camera()
-	if camera:
-		_detach_main_camera_from_mech()
-		main_fov = clampf(main_fov, min_fov_limit, max_fov_limit)
-		_initialize_main_camera_orbit()
-		camera.make_current()
-		camera.fov = main_fov
+	_setup_main_camera_controller()
+	_setup_enemy_fire_cinematic_controller()
 	hit_sound = _find_audio_player_3d("HitSound")
 	_set_analog_hud_visible(false)
 
@@ -236,33 +233,32 @@ func _ready():
 
 	cinematic_camera = Camera3D.new()
 	cinematic_camera.current = false
-	_setup_analog_heartbeat_player()
+	_setup_analog_heartbeat_controller()
 	get_tree().root.call_deferred("add_child", cinematic_camera)
 	call_deferred("_setup_dossier_presenter")
 
-func _setup_analog_heartbeat_player() -> void:
-	analog_heartbeat_player = AudioStreamPlayer.new()
-	analog_heartbeat_player.name = "AnalogHeartbeat"
-	analog_heartbeat_player.stream = analog_heartbeat_stream
-	analog_heartbeat_player.volume_db = analog_heartbeat_volume_db
-	analog_heartbeat_player.pitch_scale = analog_heartbeat_pitch_scale
-	cinematic_camera.add_child(analog_heartbeat_player)
-	analog_heartbeat_player.finished.connect(_on_analog_heartbeat_finished)
+func _setup_analog_heartbeat_controller() -> void:
+	analog_heartbeat_controller = ANALOG_HEARTBEAT_CONTROLLER.new()
+	analog_heartbeat_controller.name = "AnalogHeartbeatController"
+	add_child(analog_heartbeat_controller)
+	analog_heartbeat_controller.configure(
+		cinematic_camera,
+		analog_heartbeat_stream,
+		analog_heartbeat_volume_db,
+		analog_heartbeat_pitch_scale,
+		Callable(self, "_should_loop_analog_heartbeat")
+	)
 
-func _on_analog_heartbeat_finished() -> void:
-	if combat_view_state == CombatViewState.ANALOG_AIM_VIEW and analog_heartbeat_player:
-		analog_heartbeat_player.play()
+func _should_loop_analog_heartbeat() -> bool:
+	return combat_view_state == CombatViewState.ANALOG_AIM_VIEW
 
 func _play_analog_heartbeat() -> void:
-	if not analog_heartbeat_player or not analog_heartbeat_stream:
-		return
-	analog_heartbeat_player.volume_db = analog_heartbeat_volume_db
-	analog_heartbeat_player.pitch_scale = analog_heartbeat_pitch_scale
-	analog_heartbeat_player.play()
+	if analog_heartbeat_controller and analog_heartbeat_controller.has_method("play"):
+		analog_heartbeat_controller.play(analog_heartbeat_stream, analog_heartbeat_volume_db, analog_heartbeat_pitch_scale)
 
 func _stop_analog_heartbeat() -> void:
-	if analog_heartbeat_player:
-		analog_heartbeat_player.stop()
+	if analog_heartbeat_controller and analog_heartbeat_controller.has_method("stop"):
+		analog_heartbeat_controller.stop()
 
 func _setup_dossier_presenter() -> void:
 	var canvas_layer = get_node_or_null("CanvasLayer")
@@ -289,6 +285,29 @@ func _setup_player_damage_model() -> void:
 	player_damage_model.reset()
 	player_damage_model.destroyed.connect(_on_player_destroyed)
 	is_dead = player_damage_model.is_dead
+
+func _setup_main_camera_controller() -> void:
+	main_camera_controller = MAIN_CAMERA_CONTROLLER.new()
+	main_camera_controller.name = "MainCameraController"
+	add_child(main_camera_controller)
+	main_camera_controller.configure({
+		"cockpit": self,
+		"main_fov": main_fov,
+		"min_fov_limit": min_fov_limit,
+		"max_fov_limit": max_fov_limit,
+		"zoom_sensitivity": zoom_sensitivity,
+		"orbit_target_offset": main_camera_orbit_target_offset,
+		"orbit_distance": main_camera_orbit_distance,
+		"min_pitch": main_camera_min_pitch,
+		"max_pitch": main_camera_max_pitch,
+		"orbit_blend_speed": main_camera_orbit_blend_speed
+	})
+	camera = main_camera_controller.bind_initial_camera()
+
+func _setup_enemy_fire_cinematic_controller() -> void:
+	enemy_fire_cinematic_controller = ENEMY_FIRE_CINEMATIC_CONTROLLER.new()
+	enemy_fire_cinematic_controller.name = "EnemyFireCinematicController"
+	add_child(enemy_fire_cinematic_controller)
 
 func get_hp_snapshot() -> Dictionary:
 	if player_damage_model and player_damage_model.has_method("get_hp_snapshot"):
@@ -336,14 +355,13 @@ func _input(event):
 		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			_begin_aim_flow()
 			return
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			main_fov = clamp(main_fov - zoom_sensitivity, min_fov_limit, max_fov_limit)
-		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			main_fov = clamp(main_fov + zoom_sensitivity, min_fov_limit, max_fov_limit)
+		if main_camera_controller and main_camera_controller.has_method("handle_mouse_button"):
+			if main_camera_controller.handle_mouse_button(event):
+				return
 
 	if event is InputEventMouseMotion and combat_view_state == CombatViewState.NORMAL_VIEW and not is_reloading and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		main_camera_orbit_yaw -= event.relative.x * mouse_sensitivity
-		main_camera_orbit_pitch = clampf(main_camera_orbit_pitch + event.relative.y * mouse_sensitivity, main_camera_min_pitch, main_camera_max_pitch)
+		if main_camera_controller and main_camera_controller.has_method("handle_orbit_motion"):
+			main_camera_controller.handle_orbit_motion(event.relative, mouse_sensitivity)
 
 var current_target_range: float = 0.0
 var is_on_target: bool = false
@@ -355,13 +373,8 @@ func _process(delta):
 		_try_bind_main_camera()
 
 	# Butter-Smooth Blend
-	if camera and not is_transitioning:
-		main_fov = clampf(main_fov, min_fov_limit, max_fov_limit)
-		var target_fov = main_fov
-		var blend_speed = 10.0
-		# Adjust delta to ignore slomo so zoom stays fast
-		var real_delta = delta / Engine.time_scale if Engine.time_scale > 0.001 else delta
-		camera.fov = lerpf(camera.fov, target_fov, blend_speed * real_delta)
+	if main_camera_controller and main_camera_controller.has_method("update_fov"):
+		main_camera_controller.update_fov(delta, is_transitioning)
 
 	if player_damage_model and player_damage_model.has_method("update"):
 		player_damage_model.update(delta)
@@ -403,7 +416,8 @@ func _process(delta):
 		_update_cinematic(delta)
 
 	if combat_view_state == CombatViewState.NORMAL_VIEW and not is_transitioning:
-		_update_main_camera_orbit(delta)
+		if main_camera_controller and main_camera_controller.has_method("update_orbit"):
+			main_camera_controller.update_orbit(delta, sway_time, base_sway_amount, current_spread)
 
 	# --- Real-time Ranging ---
 	var aim_camera = _get_aim_query_camera()
@@ -440,92 +454,15 @@ func _process(delta):
 func _is_player_view_current() -> bool:
 	return (camera != null and camera.current) or (cinematic_camera != null and cinematic_camera.current)
 
-func _find_main_camera() -> Camera3D:
-	var child_camera := get_node_or_null("Camera3D") as Camera3D
-	if child_camera:
-		return child_camera
-	var grouped_camera := get_tree().get_first_node_in_group("player_camera") as Camera3D
-	if grouped_camera:
-		return grouped_camera
-	var current_scene := get_tree().current_scene
-	if current_scene:
-		var player_orbit_camera := current_scene.get_node_or_null("PlayerOrbitCamera") as Camera3D
-		if player_orbit_camera:
-			return player_orbit_camera
-		var root_camera := current_scene.get_node_or_null("Camera3D") as Camera3D
-		if root_camera:
-			return root_camera
-		player_orbit_camera = current_scene.find_child("PlayerOrbitCamera", true, false) as Camera3D
-		if player_orbit_camera:
-			return player_orbit_camera
-	return null
-
 func _try_bind_main_camera() -> void:
-	camera = _find_main_camera()
-	if not camera:
-		return
-	_detach_main_camera_from_mech()
-	_initialize_main_camera_orbit()
-	camera.fov = main_fov
+	if main_camera_controller and main_camera_controller.has_method("try_bind_camera"):
+		camera = main_camera_controller.try_bind_camera()
 	hit_sound = _find_audio_player_3d("HitSound")
 
 func _find_audio_player_3d(node_name: String) -> AudioStreamPlayer3D:
-	var player := find_child(node_name, true, false) as AudioStreamPlayer3D
-	if player:
-		return player
-	if camera:
-		return camera.find_child(node_name, true, false) as AudioStreamPlayer3D
+	if main_camera_controller and main_camera_controller.has_method("find_audio_player_3d"):
+		return main_camera_controller.find_audio_player_3d(node_name)
 	return null
-
-func _detach_main_camera_from_mech() -> void:
-	if not camera:
-		return
-	var scene_root := get_tree().current_scene
-	if not scene_root:
-		scene_root = get_tree().root
-	if camera.get_parent() == scene_root:
-		camera.add_to_group("player_camera")
-		return
-	var world_transform := camera.global_transform
-	var old_parent := camera.get_parent()
-	if old_parent:
-		old_parent.remove_child(camera)
-	scene_root.add_child(camera)
-	camera.top_level = false
-	camera.global_transform = world_transform
-	camera.add_to_group("player_camera")
-
-func _initialize_main_camera_orbit() -> void:
-	if not camera:
-		return
-	var target := global_position + main_camera_orbit_target_offset
-	var camera_offset := camera.global_position - target
-	var derived_distance := camera_offset.length()
-	if main_camera_orbit_distance <= 0.0:
-		main_camera_orbit_distance = maxf(0.1, derived_distance)
-	if derived_distance > 0.001:
-		main_camera_orbit_yaw = atan2(camera_offset.x, camera_offset.z)
-		main_camera_orbit_pitch = asin(clampf(camera_offset.y / derived_distance, -1.0, 1.0))
-	main_camera_orbit_pitch = clampf(main_camera_orbit_pitch, main_camera_min_pitch, main_camera_max_pitch)
-
-func _update_main_camera_orbit(delta: float) -> void:
-	if not camera:
-		return
-	var real_delta := delta / Engine.time_scale if Engine.time_scale > 0.001 else delta
-	var radius := maxf(0.1, main_camera_orbit_distance)
-	var target := global_position + main_camera_orbit_target_offset
-	var cos_pitch := cos(main_camera_orbit_pitch)
-	var orbit_offset := Vector3(
-		sin(main_camera_orbit_yaw) * cos_pitch * radius,
-		sin(main_camera_orbit_pitch) * radius,
-		cos(main_camera_orbit_yaw) * cos_pitch * radius
-	)
-	var blend := clampf(main_camera_orbit_blend_speed * real_delta, 0.0, 1.0)
-	camera.global_position = camera.global_position.lerp(target + orbit_offset, blend)
-	var current_sway := base_sway_amount + (current_spread * 0.05)
-	var sway_offset := camera.global_transform.basis.x * (sin(sway_time * 0.8) * current_sway * radius)
-	sway_offset += Vector3.UP * (cos(sway_time * 1.1) * current_sway * radius)
-	camera.look_at(target + sway_offset, Vector3.UP)
 
 func _update_analog_aim(delta: float) -> void:
 	var target_point = _get_analog_target_point()
@@ -700,39 +637,19 @@ func _update_analog_camera_presentation(delta: float) -> void:
 		cinematic_camera.look_at(drifted_point, Vector3.UP)
 
 func begin_enemy_fire_cinematic(fire_callable: Callable) -> void:
-	if is_dead:
+	if enemy_fire_cinematic_controller and enemy_fire_cinematic_controller.has_method("begin"):
+		enemy_fire_cinematic_controller.begin(fire_callable, camera, cinematic_camera, is_dead, Callable(self, "_end_cinematic_if_active"))
+	else:
 		fire_callable.call()
-		return
 
-	var enemy_cam := _find_scene_camera("FiringSequenceCam")
-	if not enemy_cam:
-		fire_callable.call()
-		return
-
-	enemy_fire_cinematic_active = true
+func _end_cinematic_if_active() -> void:
 	if cinematic_phase > 0:
 		_end_cinematic()
 
-	if camera:
-		camera.current = false
-	cinematic_camera.current = false
-	enemy_cam.current = true
-
-	get_tree().create_timer(2.0).timeout.connect(func():
-		fire_callable.call()
-		get_tree().create_timer(2.0).timeout.connect(func():
-			enemy_cam.current = false
-			if camera:
-				camera.current = true
-			enemy_fire_cinematic_active = false
-		)
-	)
-
-func _find_scene_camera(cam_name: String) -> Camera3D:
-	var scene := get_tree().current_scene
-	if scene:
-		return scene.get_node_or_null(cam_name) as Camera3D
-	return null
+func _is_enemy_fire_cinematic_active() -> bool:
+	if enemy_fire_cinematic_controller and enemy_fire_cinematic_controller.has_method("is_active"):
+		return enemy_fire_cinematic_controller.is_active()
+	return false
 
 func _begin_aim_flow() -> void:
 	if is_reloading or is_transitioning or combat_view_state != CombatViewState.NORMAL_VIEW:
@@ -1166,7 +1083,7 @@ func _disrupt_aim_after_fire() -> void:
 var is_transitioning: bool = false
 
 func fire_cannon():
-	if is_reloading or is_transitioning or enemy_fire_cinematic_active:
+	if is_reloading or is_transitioning or _is_enemy_fire_cinematic_active():
 		return
 
 	if combat_view_state == CombatViewState.NORMAL_VIEW:
