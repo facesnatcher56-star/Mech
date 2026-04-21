@@ -102,6 +102,7 @@ const _CANNON_FIRE_STREAM = preload("res://assets/Sounds/artillery-gunfire2.wav"
 @export var fallback_hit_damage: int = 18
 
 var _fire_timer: float = 0.0
+var _cycle_active: bool = false
 var _is_aiming: bool = false
 var _aim_timer: float = 0.0
 var _aim_duration: float = 0.0
@@ -302,7 +303,7 @@ func _process(delta: float) -> void:
 	_update_aiming(delta)
 
 func _update_fire_timer(delta: float) -> void:
-	if is_destroyed or _is_aiming:
+	if is_destroyed or _is_aiming or _cycle_active:
 		return
 	if get_tree().get_nodes_in_group("shell_in_flight").size() > 0:
 		return
@@ -333,6 +334,7 @@ func _update_aiming(delta: float) -> void:
 	_aim_timer += delta
 	if _aim_timer >= _aim_duration:
 		_is_aiming = false
+		_cycle_active = true
 		_fire_at_player()
 
 func _fire_at_player() -> void:
@@ -341,9 +343,10 @@ func _fire_at_player() -> void:
 		return
 
 	if player.has_method("begin_enemy_fire_cinematic"):
-		player.begin_enemy_fire_cinematic(func(): _launch_shell(player))
+		player.begin_enemy_fire_cinematic(func(): _launch_shell(player), func(): _cycle_active = false)
 	else:
 		_launch_shell(player)
+		_cycle_active = false
 
 func _launch_shell(player: Node3D) -> void:
 	if not is_instance_valid(player):

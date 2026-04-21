@@ -16,6 +16,7 @@ const PROJECTILE = preload("res://scenes/projectile.tscn")
 
 var is_destroyed: bool = false
 var _fire_timer: float = 0.0
+var _cycle_active: bool = false
 
 @onready var player = get_tree().get_first_node_in_group("player")
 
@@ -27,10 +28,12 @@ func _physics_process(delta):
 	if is_destroyed:
 		return
 
-	_fire_timer -= delta
-	if _fire_timer <= 0.0:
-		_fire_timer = fire_interval
-		_begin_fire_cinematic()
+	if not _cycle_active:
+		_fire_timer -= delta
+		if _fire_timer <= 0.0:
+			_fire_timer = fire_interval
+			_cycle_active = true
+			_begin_fire_cinematic()
 
 	_align_to_ground()
 
@@ -60,9 +63,10 @@ func _begin_fire_cinematic() -> void:
 		return
 
 	if player.has_method("begin_enemy_fire_cinematic"):
-		player.begin_enemy_fire_cinematic(Callable(self, "_spawn_shell"))
+		player.begin_enemy_fire_cinematic(Callable(self, "_spawn_shell"), func(): _cycle_active = false)
 	else:
 		_spawn_shell()
+		_cycle_active = false
 
 func _spawn_shell() -> void:
 	if not is_instance_valid(player):

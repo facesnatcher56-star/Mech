@@ -25,6 +25,7 @@ var _pre_enemy_cinematic_view_state: int = -1
 var _hit_during_enemy_cinematic: bool = false
 var _saved_aim_state: Dictionary = {}
 var _saved_aim_ray: Dictionary = {}
+var _on_enemy_cycle_complete: Callable = Callable()
 
 var mouse_sensitivity: float = 0.002
 var sway_time: float = 0.0
@@ -764,9 +765,12 @@ func _update_analog_camera_presentation(delta: float) -> void:
 			aim_camera_chunk_settle_speed
 		)
 
-func begin_enemy_fire_cinematic(fire_callable: Callable) -> void:
+func begin_enemy_fire_cinematic(fire_callable: Callable, on_complete: Callable = Callable()) -> void:
 	if get_tree().get_nodes_in_group("shell_in_flight").size() > 0:
+		if on_complete.is_valid():
+			on_complete.call()
 		return
+	_on_enemy_cycle_complete = on_complete
 	_pre_enemy_cinematic_view_state = combat_view_flow_controller.combat_view_state if combat_view_flow_controller else -1
 	_hit_during_enemy_cinematic = false
 	if _pre_enemy_cinematic_view_state == CombatViewState.ANALOG_AIM_VIEW:
@@ -780,6 +784,8 @@ func begin_enemy_fire_cinematic(fire_callable: Callable) -> void:
 		enemy_fire_cinematic_controller.begin(fire_callable, camera, cinematic_camera, is_dead, Callable(self, "_end_cinematic_if_active"))
 	else:
 		fire_callable.call()
+		if on_complete.is_valid():
+			on_complete.call()
 
 func set_enemy_active_shell(shell: Node3D, impact_pos: Vector3) -> void:
 	if enemy_fire_cinematic_controller and enemy_fire_cinematic_controller.has_method("set_active_shell"):
@@ -986,6 +992,9 @@ func _on_projectile_cinematic_end() -> void:
 
 func _on_enemy_fire_cinematic_end() -> void:
 	_clear_shell_flight_lock()
+	if _on_enemy_cycle_complete.is_valid():
+		_on_enemy_cycle_complete.call()
+		_on_enemy_cycle_complete = Callable()
 	if not _hit_during_enemy_cinematic and _pre_enemy_cinematic_view_state == CombatViewState.ANALOG_AIM_VIEW and not is_dead:
 		if analog_aim_solution_controller and not _saved_aim_state.is_empty():
 			analog_aim_solution_controller.restore_state(_saved_aim_state)

@@ -16,7 +16,6 @@ extends Area3D
 ## If enabled, a swept ray hit resolves the shell immediately. If disabled, it only reports likely tunneling.
 @export var collision_debug_resolve_sweep_hits: bool = false
 const IMPACT_VFX = preload("res://scenes/impact_vfx.tscn")
-const _INCOMING_STREAM = preload("res://assets/Sounds/incoming-mortar-1.wav")
 var shooter: Node3D = null
 var is_player_shot: bool = false
 var is_destined_for_hit: bool = false
@@ -34,12 +33,6 @@ func _ready():
 	_last_position = global_position
 	add_to_group("shell_in_flight")
 	
-	if not is_player_shot:
-		var whistle := AudioStreamPlayer3D.new()
-		whistle.stream = _INCOMING_STREAM
-		whistle.max_distance = 300.0
-		add_child(whistle)
-		whistle.play()
 
 	if collision_debug_enabled:
 		print("[SHELL TRACE] spawn pos=", _fmt_vec(global_position), " speed=", speed, " mask=", collision_debug_mask, " destined_hit=", is_destined_for_hit)

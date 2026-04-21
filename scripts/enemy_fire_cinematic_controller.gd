@@ -1,5 +1,7 @@
 extends Node
 
+const _INCOMING_STREAM = preload("res://assets/Sounds/incoming-mortar-1.wav")
+
 signal cinematic_ended
 
 @export_group("Cinematic Timing")
@@ -10,13 +12,13 @@ signal cinematic_ended
 
 @export_group("Action Cam Adjustments")
 ## Distance from camera to trigger slow motion.
-@export var trigger_distance: float = 40.0
+@export var trigger_distance: float = 5.0
 ## Slow motion time scale (0.01 = 1% speed, 1.0 = normal speed).
-@export_range(0.01, 1.0, 0.01) var action_time_scale: float = 0.6
+@export_range(0.01, 1.0, 0.01) var action_time_scale: float = 1.0
 ## How long to hold on the impact (in world seconds).
-@export var linger_duration: float = .2
+@export var linger_duration: float = .8
 ## FOV for the action cameras.
-@export var action_fov: float = 65.0
+@export var action_fov: float = 90.0
 
 @export_group("Cameras")
 @export var firing_sequence_cam: Camera3D
@@ -106,6 +108,13 @@ func _transition_to_action_cam() -> void:
 
 	selected_action_cam.fov = action_fov
 	selected_action_cam.current = true
+
+	if is_instance_valid(active_shell):
+		var whistle := AudioStreamPlayer.new()
+		whistle.stream = _INCOMING_STREAM
+		active_shell.add_child(whistle)
+		whistle.play()
+
 	phase = 2
 	timer = 0.0
 
