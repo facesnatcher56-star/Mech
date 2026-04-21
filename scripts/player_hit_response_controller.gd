@@ -1,5 +1,7 @@
 extends Node
 
+const _HIT_STREAM = preload("res://assets/Sounds/hittest.wav")
+
 signal reload_started()
 
 var cockpit: Node3D = null
@@ -31,6 +33,7 @@ func apply_hit(camera: Camera3D, current_is_dead: bool) -> bool:
 	_show_player_hit(damage_result)
 	_abort_outgoing_cinematic()
 	_play_hit_shake(camera)
+	_play_hit_sound()
 
 	if is_dead:
 		_play_player_death()
@@ -64,9 +67,19 @@ func _play_hit_shake(camera: Camera3D) -> void:
 	reset_tween.tween_property(camera, "h_offset", 0.0, 0.05).set_delay(0.3)
 	reset_tween.tween_property(camera, "v_offset", 0.0, 0.05).set_delay(0.3)
 
+func _play_hit_sound() -> void:
+	if not cockpit:
+		return
+	var sfx := AudioStreamPlayer3D.new()
+	sfx.stream = _HIT_STREAM
+	cockpit.add_child(sfx)
+	sfx.play()
+	sfx.finished.connect(sfx.queue_free)
+
 func _play_player_death() -> void:
 	if not cockpit:
 		return
 	var death_tween = cockpit.create_tween()
+	death_tween.set_parallel(true)
 	death_tween.tween_property(cockpit, "rotation_degrees:z", 85.0, 2.0).set_trans(Tween.TRANS_SINE)
-	death_tween.tween_property(cockpit, "position:y", -2.0, 2.0).set_parallel(true)
+	death_tween.tween_property(cockpit, "position:y", -2.0, 2.0)

@@ -1,0 +1,125 @@
+[gd_scene load_steps=10 format=3 uid="uid://cyvuoy641a8qh"]
+
+[ext_resource type="Script" path="res://scripts/enemy_mech.gd" id="1_script"]
+[ext_resource type="Material" uid="uid://c3rfhtu3pakmg" path="res://materials/cockpit_industrial.tres" id="3_cockpit"]
+[ext_resource type="Script" path="res://scripts/mech_part.gd" id="4_part_script"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eye"]
+albedo_color = Color(1, 0, 0, 1)
+emission_enabled = true
+emission = Color(1, 0, 0, 1)
+emission_energy_multiplier = 5.0
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_torso"]
+size = Vector3(0.6, 0.8, 0.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_head"]
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_arm"]
+size = Vector3(0.2, 0.6, 0.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_leg"]
+size = Vector3(0.25, 0.8, 0.25)
+
+[node name="EnemyMech" type="Node3D" unique_id=1411672813 groups=["enemy"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
+script = ExtResource("1_script")
+
+[node name="Body" type="Node3D" parent="."]
+
+[node name="NamePlate" type="Label3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.15, 0)
+billboard = 1
+double_sided = false
+no_depth_test = true
+modulate = Color(1, 0, 0, 1)
+text = "THE ZEZLAN"
+font_size = 20
+outline_size = 4
+outline_modulate = Color(0, 0, 0, 1)
+
+[node name="Torso" type="StaticBody3D" parent="Body" unique_id=1544597836 groups=["enemy"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
+script = ExtResource("4_part_script")
+part_name = "Torso"
+is_vital = true
+parent_mech = NodePath("../..")
+
+[node name="Mesh" type="CSGBox3D" parent="Body/Torso"]
+size = Vector3(0.6, 0.8, 0.4)
+material = ExtResource("3_cockpit")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Body/Torso"]
+shape = SubResource("BoxShape3D_torso")
+
+[node name="Head" type="StaticBody3D" parent="Body" groups=["enemy"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.85, 0)
+script = ExtResource("4_part_script")
+part_name = "Head"
+is_vital = true
+parent_mech = NodePath("../..")
+
+[node name="Mesh" type="CSGBox3D" parent="Body/Head"]
+size = Vector3(0.3, 0.3, 0.3)
+material = ExtResource("3_cockpit")
+
+[node name="Eye" type="CSGBox3D" parent="Body/Head/Mesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0.15)
+size = Vector3(0.2, 0.05, 0.05)
+material = SubResource("StandardMaterial3D_eye")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Body/Head"]
+shape = SubResource("BoxShape3D_head")
+
+[node name="RightArm" type="StaticBody3D" parent="Body" groups=["enemy"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.35, 0)
+script = ExtResource("4_part_script")
+part_name = "Right Arm"
+parent_mech = NodePath("../..")
+
+[node name="Mesh" type="CSGBox3D" parent="Body/RightArm"]
+size = Vector3(0.2, 0.6, 0.2)
+material = ExtResource("3_cockpit")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Body/RightArm"]
+shape = SubResource("BoxShape3D_arm")
+
+[node name="LeftArm" type="StaticBody3D" parent="Body" groups=["enemy"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 1.35, 0)
+script = ExtResource("4_part_script")
+part_name = "Left Arm"
+parent_mech = NodePath("../..")
+
+[node name="Mesh" type="CSGBox3D" parent="Body/LeftArm"]
+size = Vector3(0.2, 0.6, 0.2)
+material = ExtResource("3_cockpit")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Body/LeftArm"]
+shape = SubResource("BoxShape3D_arm")
+
+[node name="RightLeg" type="StaticBody3D" parent="Body" groups=["enemy"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.2, 0.4, 0)
+script = ExtResource("4_part_script")
+part_name = "Right Leg"
+parent_mech = NodePath("../..")
+
+[node name="Mesh" type="CSGBox3D" parent="Body/RightLeg"]
+size = Vector3(0.25, 0.8, 0.25)
+material = ExtResource("3_cockpit")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Body/RightLeg"]
+shape = SubResource("BoxShape3D_leg")
+
+[node name="LeftLeg" type="StaticBody3D" parent="Body" groups=["enemy"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 0.4, 0)
+script = ExtResource("4_part_script")
+part_name = "Left Leg"
+parent_mech = NodePath("../..")
+
+[node name="Mesh" type="CSGBox3D" parent="Body/LeftLeg"]
+size = Vector3(0.25, 0.8, 0.25)
+material = ExtResource("3_cockpit")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Body/LeftLeg"]
+shape = SubResource("BoxShape3D_leg")

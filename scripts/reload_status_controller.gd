@@ -25,7 +25,8 @@ func update(delta: float) -> Dictionary:
 	var reload_progress = 0.0
 
 	if is_reloading:
-		reload_timer += delta
+		if get_tree().get_nodes_in_group("shell_in_flight").size() == 0:
+			reload_timer += delta
 		current_spread = max_spread
 		reload_progress = 1.0 - (reload_timer / reload_duration)
 		if reload_timer >= reload_duration:

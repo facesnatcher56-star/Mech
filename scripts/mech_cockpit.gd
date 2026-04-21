@@ -204,6 +204,7 @@ func _ready():
 	add_to_group("player")
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
+	_build_mesh_colliders()
 	_setup_player_damage_model()
 	_setup_main_camera_controller()
 	_setup_enemy_fire_cinematic_controller()
@@ -619,9 +620,6 @@ func _process(delta):
 	if dossier_presenter and dossier_presenter.has_method("update_self_status"):
 		dossier_presenter.update_self_status(get_hp_snapshot(), reload_progress)
 
-	# Push enemy HP + reload into enemy status dossier every frame
-	if dossier_presenter and dossier_presenter.has_method("update_enemy_status"):
-		dossier_presenter.update_enemy_status()
 
 	if projectile_cinematic_controller and projectile_cinematic_controller.has_method("is_active"):
 		if projectile_cinematic_controller.is_active():
@@ -757,6 +755,8 @@ func _update_analog_camera_presentation(delta: float) -> void:
 		)
 
 func begin_enemy_fire_cinematic(fire_callable: Callable) -> void:
+	if get_tree().get_nodes_in_group("shell_in_flight").size() > 0:
+		return
 	if combat_view_flow_controller:
 		combat_view_flow_controller.reset_to_normal(CombatViewState.NORMAL_VIEW)
 
@@ -851,7 +851,7 @@ func _disrupt_aim_after_fire() -> void:
 @export var slomo_scale: float = 0.1
 
 func fire_cannon():
-	if is_reloading or combat_view_flow_controller.is_transitioning or _is_enemy_fire_cinematic_active():
+	if is_reloading or combat_view_flow_controller.is_transitioning or _is_enemy_fire_cinematic_active() or get_tree().get_nodes_in_group("shell_in_flight").size() > 0:
 		return
 
 	if combat_view_flow_controller.combat_view_state == CombatViewState.NORMAL_VIEW:
@@ -943,3 +943,25 @@ func _on_projectile_cinematic_end() -> void:
 		combat_view_flow_controller.reset_to_normal(CombatViewState.NORMAL_VIEW)
 	if combat_bark_ui:
 		combat_bark_ui.hide_bark()
+
+func _build_mesh_colliders() -> void:
+	var meshes: Array[MeshInstance3D] = []
+	_collect_mesh_instances(self, meshes)
+	for mesh_instance in meshes:
+		var shape := mesh_instance.mesh.create_trimesh_shape()
+		if not shape:
+			continue
+		var body := StaticBody3D.new()
+		body.collision_layer = 1
+		body.collision_mask = 1
+		body.add_to_group("player")
+		var col := CollisionShape3D.new()
+		col.shape = shape
+		body.add_child(col)
+		mesh_instance.add_child(body)
+
+func _collect_mesh_instances(node: Node, out: Array[MeshInstance3D]) -> void:
+	if node is MeshInstance3D and (node as MeshInstance3D).mesh and node.visible:
+		out.append(node as MeshInstance3D)
+	for child in node.get_children():
+		_collect_mesh_instances(child, out)

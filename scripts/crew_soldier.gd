@@ -95,7 +95,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_try_order_rpg()
 
 func _process(delta: float) -> void:
-	if cooldown_timer > 0.0:
+	if cooldown_timer > 0.0 and get_tree().get_nodes_in_group("shell_in_flight").size() == 0:
 		cooldown_timer = max(0.0, cooldown_timer - delta)
 	_sync_crew_order_ui(false)
 	_update_patrol(delta)

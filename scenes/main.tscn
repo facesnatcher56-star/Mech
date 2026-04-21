@@ -67,8 +67,6 @@ particles_anim_loop = false
 [sub_resource type="QuadMesh" id="QuadMesh_smoke"]
 material = SubResource("StandardMaterial3D_yc10j")
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_leg"]
-size = Vector3(0.25, 0.8, 0.25)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bark"]
 bg_color = Color(0, 0, 0, 0.85)
@@ -187,6 +185,10 @@ script = ExtResource("2_script")
 firecam_duration = 0.2
 impact_side_camera_trigger_distance = 60.0
 impact_side_camera_time_scale = 0.6
+aim_camera_stage_1_time = 3.0
+aim_camera_stage_2_time = 4.0
+aim_camera_stage_3_time = 5.0
+aim_camera_stage_4_time = 6.0
 analog_heartbeat_volume_db = 5.0
 
 [node name="DirectionalSmoke" type="GPUParticles3D" parent="WIPtestmech/Armature" parent_id_path=PackedInt32Array(1679724251, 359783737) index="0" unique_id=641991123]
@@ -258,12 +260,6 @@ transform = Transform3D(0.91616416, -0.3997972, -0.028380089, 0.39979723, 0.9065
 [node name="RightFoot" parent="WIPtestmech/Armature/TorsoLowerR/LegR/FootR" index="0" unique_id=1107744312]
 transform = Transform3D(0.15202108, -0.4955742, -0.8551586, -0.027088383, -0.8669786, 0.49760884, -0.9880061, -0.052482143, -0.14522335, 0.0025524963, -0.0475505, 0.04030769)
 
-[node name="Collision" type="StaticBody3D" parent="WIPtestmech" unique_id=1915282858]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
-
-[node name="Shape" type="CollisionShape3D" parent="WIPtestmech/Collision" unique_id=738984214]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
-shape = SubResource("BoxShape3D_leg")
 
 [node name="SideCamMortarSound" type="AudioStreamPlayer" parent="WIPtestmech" unique_id=39001304]
 stream = ExtResource("11_miss_sound")
@@ -459,6 +455,7 @@ script = ExtResource("18_pause_menu")
 [node name="zezlan" parent="." unique_id=1717272107 instance=ExtResource("13_trceg")]
 transform = Transform3D(-5, 0, -4.371139e-07, 0, 5, 0, 4.371139e-07, 0, -5, 34.724888, -0.4905479, 154.95802)
 script = ExtResource("20_zezlan_movement")
+initial_fire_delay = 5.0
 local_travel_direction = Vector3(0, 0, 1)
 max_travel_speed = 8.0
 
@@ -491,6 +488,7 @@ libraries/ = SubResource("AnimationLibrary_gqmmt")
 [node name="FiringSequenceCam" type="Camera3D" parent="." unique_id=3000012]
 transform = Transform3D(-0.4257003, 0, -0.9048642, 0, 1, 0, 0.9048642, 0, -0.4257003, 30.719206, 3.2339597, 150.19206)
 script = ExtResource("23_firing_seq_cam")
+pre_fire_hold = 0.5
 
 [node name="SideCamLeft" type="Marker3D" parent="." unique_id=39001302 groups=["side_cam_left"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.793173, 5, 127.393265)

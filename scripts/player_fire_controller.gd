@@ -125,13 +125,14 @@ func _on_shell_hit(body: Node, hit_pos: Vector3) -> void:
 		if not damage_result.is_empty() and str(damage_result.get("part_key", "")) != "":
 			bark_part_name = str(damage_result.get("part_key", ""))
 
+	if is_enemy and hit_sound:
+		hit_sound.global_position = hit_pos
+		hit_sound.play()
+
 	if combat_bark_ui:
 		combat_bark_ui.show_result(is_enemy, bark_part_name if is_enemy else "")
 		if not is_enemy:
 			_show_direct_miss(hit_pos)
-	elif is_enemy and hit_sound:
-		hit_sound.global_position = hit_pos
-		hit_sound.play()
 
 func _show_direct_miss(hit_pos: Vector3) -> void:
 	var should_show_miss := true

@@ -6,7 +6,6 @@ var cockpit: Node = null
 var canvas_layer: CanvasLayer = null
 var target_dossier_ui: Control = null
 var self_dossier_ui: Control = null
-var enemy_status_ui: Control = null
 
 func configure(new_cockpit: Node, new_canvas_layer: CanvasLayer) -> void:
 	cockpit = new_cockpit
@@ -15,7 +14,6 @@ func configure(new_cockpit: Node, new_canvas_layer: CanvasLayer) -> void:
 		return
 	_setup_target_dossier_ui()
 	_setup_self_dossier_ui()
-	_setup_enemy_status_ui()
 
 func update_self_status(snapshot: Dictionary, reload_progress: float) -> void:
 	if not self_dossier_ui:
@@ -24,22 +22,10 @@ func update_self_status(snapshot: Dictionary, reload_progress: float) -> void:
 	snap["reload"] = {"progress": reload_progress, "label": "CANNON"}
 	self_dossier_ui.set_snapshot(snap)
 
-func update_enemy_status() -> void:
-	if not enemy_status_ui:
-		return
-	var enemy_snap := get_current_target_hp_snapshot()
-	if not enemy_snap.is_empty():
-		enemy_status_ui.show_dossier(enemy_snap)
-	else:
-		# Keep it visible but potentially with default/empty data if no enemy found yet
-		# though usually Zezlan is there.
-		pass
 
 func sync_view_visibility(in_normal_view: bool) -> void:
 	if self_dossier_ui:
 		self_dossier_ui.visible = in_normal_view
-	if enemy_status_ui:
-		enemy_status_ui.visible = in_normal_view
 
 func show_target_dossier() -> void:
 	if not target_dossier_ui:
@@ -114,15 +100,6 @@ func _setup_self_dossier_ui() -> void:
 	canvas_layer.add_child(self_dossier_ui)
 	self_dossier_ui.show_dossier(_get_player_snapshot())
 
-func _setup_enemy_status_ui() -> void:
-	enemy_status_ui = TARGET_DOSSIER_UI.new()
-	enemy_status_ui.name = "EnemyStatusUI"
-	enemy_status_ui.anchor_corner = TARGET_DOSSIER_UI.AnchorCorner.TOP_RIGHT
-	enemy_status_ui.display_scale = 0.65
-	enemy_status_ui.custom_offset_x = 0.0
-	enemy_status_ui.custom_offset_y = 0.0
-	canvas_layer.add_child(enemy_status_ui)
-	enemy_status_ui.visible = false
 
 func _get_current_target_node() -> Node3D:
 	if cockpit and cockpit.has_method("_get_analog_target_node"):

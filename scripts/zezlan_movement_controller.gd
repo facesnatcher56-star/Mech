@@ -1,6 +1,7 @@
 extends Node3D
 
 const PROJECTILE = preload("res://scenes/projectile.tscn")
+const _CANNON_FIRE_STREAM = preload("res://assets/Sounds/artillery-gunfire2.wav")
 
 @export_group("Zezlan Firing")
 ## Seconds between each shot fired at the player.
@@ -285,6 +286,8 @@ func _process(delta: float) -> void:
 func _update_fire_timer(delta: float) -> void:
 	if is_destroyed:
 		return
+	if get_tree().get_nodes_in_group("shell_in_flight").size() > 0:
+		return
 	_fire_timer -= delta
 	if _fire_timer <= 0.0:
 		_fire_timer = fire_interval
@@ -311,6 +314,14 @@ func _launch_shell(player: Node3D) -> void:
 
 	var muzzle_pos := _get_muzzle_position()
 	var aim_pos    := player.global_position + Vector3.UP * aim_height_offset
+
+	var fire_sfx := AudioStreamPlayer3D.new()
+	fire_sfx.stream = _CANNON_FIRE_STREAM
+	fire_sfx.max_distance = 300.0
+	get_tree().root.add_child(fire_sfx)
+	fire_sfx.global_position = muzzle_pos
+	fire_sfx.play()
+	fire_sfx.finished.connect(fire_sfx.queue_free)
 
 	var shell := PROJECTILE.instantiate()
 	shell.shooter = self

@@ -159,4 +159,3 @@ func end() -> void:
 
 func is_active() -> bool:
 	return active
-
