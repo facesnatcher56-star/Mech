@@ -8,6 +8,8 @@ enum AnchorCorner { BOTTOM_RIGHT, TOP_LEFT, TOP_RIGHT }
 @export_range(-1000, 1000, 1) var custom_offset_x: float = 0.0
 @export_range(-1000, 1000, 1) var custom_offset_y: float = 0.0
 
+@export var minimal_mode: bool = false
+
 @export_group("Visuals")
 @export var panel_size: Vector2 = Vector2(210.0, 306.0)
 @export var panel_margin: Vector2 = Vector2(22.0, 22.0)
@@ -38,6 +40,8 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	if flash_timer > 0.0:
 		flash_timer = max(0.0, flash_timer - delta)
+		queue_redraw()
+	if snapshot.get("reload", {}).get("aiming", false):
 		queue_redraw()
 
 func set_snapshot(new_snapshot: Dictionary) -> void:
@@ -88,6 +92,10 @@ func _update_layout() -> void:
 func _draw() -> void:
 	var font := get_theme_default_font()
 	var rect := Rect2(Vector2.ZERO, panel_size)
+
+	if minimal_mode:
+		_draw_minimal(font, rect)
+		return
 
 	draw_rect(rect, background_color, true)
 	draw_rect(rect, border_color.darkened(0.45), false, 4.0)
@@ -155,6 +163,43 @@ func _draw() -> void:
 	var is_flash := flash_timer > 0.0
 	var imp_color := flash_color.lerp(Color.WHITE, 0.3 * sin(Time.get_ticks_msec() * 0.03)) if is_flash else warn_color
 	draw_string(font, Vector2(20, panel_size.y - 15), latest_impact, HORIZONTAL_ALIGNMENT_LEFT, panel_size.x - 40, 12, imp_color)
+
+func _draw_minimal(font: Font, rect: Rect2) -> void:
+	var rl: Dictionary = snapshot.get("reload", {})
+	var rl_prog  := clampf(float(rl.get("progress", 0.0)), 0.0, 1.0)
+	var rl_lbl   := str(rl.get("label", "CANNON"))
+	var is_aiming := bool(rl.get("aiming", false))
+
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006)
+	var rl_col: Color
+	if is_aiming:
+		rl_col = critical_color.lerp(warn_color, pulse)
+	else:
+		rl_col = good_color if rl_prog >= 0.95 else (warn_color if rl_prog >= 0.42 else critical_color)
+
+	var rl_stat: String
+	if is_aiming:
+		rl_stat = "AIMING"
+	elif rl_prog >= 0.95:
+		rl_stat = "READY"
+	elif rl_prog >= 0.42:
+		rl_stat = "LOADING"
+	else:
+		rl_stat = "LOADING"
+
+	var target_name := str(snapshot.get("name", "ZEZLAN"))
+
+	draw_rect(rect, background_color, true)
+	draw_rect(rect, border_color.darkened(0.45), false, 2.0)
+
+	draw_string(font, Vector2(14, 16), target_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, muted_text_color)
+	draw_string(font, Vector2(14, 30), rl_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, muted_text_color)
+	draw_string(font, Vector2(panel_size.x - 14, 30), rl_stat, HORIZONTAL_ALIGNMENT_RIGHT, -1, 9, rl_col)
+
+	var bar_r := Rect2(14, 36, panel_size.x - 28, 10)
+	draw_rect(bar_r, Color(0.02, 0.025, 0.02, 1.0), true)
+	draw_rect(Rect2(bar_r.position, Vector2(bar_r.size.x * rl_prog, bar_r.size.y)), rl_col, true)
+	draw_rect(bar_r, border_color.darkened(0.4), false, 1.0)
 
 func _get_part(parts: Dictionary, key: String) -> Dictionary:
 	if parts.has(key) and parts[key] is Dictionary:

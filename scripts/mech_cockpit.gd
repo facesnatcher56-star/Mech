@@ -620,6 +620,11 @@ func _process(delta):
 	if dossier_presenter and dossier_presenter.has_method("update_self_status"):
 		dossier_presenter.update_self_status(get_hp_snapshot(), reload_progress)
 
+	if dossier_presenter and dossier_presenter.has_method("update_enemy_reload"):
+		var enemy_snap := _get_enemy_hp_snapshot()
+		if not enemy_snap.is_empty():
+			dossier_presenter.update_enemy_reload(enemy_snap)
+
 
 	if projectile_cinematic_controller and projectile_cinematic_controller.has_method("is_active"):
 		if projectile_cinematic_controller.is_active():
@@ -965,3 +970,8 @@ func _collect_mesh_instances(node: Node, out: Array[MeshInstance3D]) -> void:
 		out.append(node as MeshInstance3D)
 	for child in node.get_children():
 		_collect_mesh_instances(child, out)
+
+func _get_enemy_hp_snapshot() -> Dictionary:
+	if dossier_presenter and dossier_presenter.has_method("get_current_target_hp_snapshot"):
+		return dossier_presenter.get_current_target_hp_snapshot()
+	return {}

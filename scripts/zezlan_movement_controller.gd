@@ -12,6 +12,12 @@ const _CANNON_FIRE_STREAM = preload("res://assets/Sounds/artillery-gunfire2.wav"
 @export var shell_speed: float = 80.0
 ## Vertical offset applied to the player aim point (targets the cockpit, not the feet).
 @export var aim_height_offset: float = 3.0
+## Minimum seconds Zezlan holds aim before firing.
+@export var min_aim_time: float = 4.0
+## Maximum seconds Zezlan holds aim before firing.
+@export var max_aim_time: float = 12.0
+## World-unit spread radius applied at minimum aim time (fully aimed = zero spread).
+@export var max_aim_spread: float = 6.0
 
 @export_group("Zezlan Movement - Input")
 ## Hold this key to raise the target throttle.
@@ -92,6 +98,9 @@ const _CANNON_FIRE_STREAM = preload("res://assets/Sounds/artillery-gunfire2.wav"
 @export var fallback_hit_damage: int = 18
 
 var _fire_timer: float = 0.0
+var _is_aiming: bool = false
+var _aim_timer: float = 0.0
+var _aim_duration: float = 0.0
 var target_throttle: float = 0.0
 var current_travel_speed: float = 0.0
 var current_animation_speed: float = 0.0
@@ -176,6 +185,8 @@ func apply_shell_damage(hit_body: Node, hit_pos: Vector3) -> Dictionary:
 func get_fire_progress() -> float:
 	if is_destroyed:
 		return 0.0
+	if _is_aiming:
+		return 1.0
 	return clampf(1.0 - (_fire_timer / maxf(0.001, fire_interval)), 0.0, 1.0)
 
 func get_hp_snapshot() -> Dictionary:
@@ -187,7 +198,7 @@ func get_hp_snapshot() -> Dictionary:
 			"left_leg": {"label": "LEFT LEG", "current": left_leg_hp, "max": max_left_leg_hp, "broken": left_leg_hp <= 0},
 			"right_leg": {"label": "RIGHT LEG", "current": right_leg_hp, "max": max_right_leg_hp, "broken": right_leg_hp <= 0}
 		},
-		"reload": {"progress": get_fire_progress(), "label": "CANNON"},
+		"reload": {"progress": get_fire_progress(), "label": "CANNON", "aiming": _is_aiming},
 		"destroyed": is_destroyed
 	}
 
@@ -282,15 +293,31 @@ func _process(delta: float) -> void:
 	_update_travel(delta)
 	_update_animation(delta)
 	_update_fire_timer(delta)
+	_update_aiming(delta)
 
 func _update_fire_timer(delta: float) -> void:
-	if is_destroyed:
+	if is_destroyed or _is_aiming:
 		return
 	if get_tree().get_nodes_in_group("shell_in_flight").size() > 0:
 		return
 	_fire_timer -= delta
 	if _fire_timer <= 0.0:
 		_fire_timer = fire_interval
+		_start_aiming()
+
+func _start_aiming() -> void:
+	_is_aiming = true
+	_aim_timer = 0.0
+	_aim_duration = randf_range(min_aim_time, max_aim_time)
+
+func _update_aiming(delta: float) -> void:
+	if not _is_aiming:
+		return
+	if get_tree().get_nodes_in_group("shell_in_flight").size() > 0:
+		return
+	_aim_timer += delta
+	if _aim_timer >= _aim_duration:
+		_is_aiming = false
 		_fire_at_player()
 
 func _fire_at_player() -> void:
@@ -314,6 +341,9 @@ func _launch_shell(player: Node3D) -> void:
 
 	var muzzle_pos := _get_muzzle_position()
 	var aim_pos    := player.global_position + Vector3.UP * aim_height_offset
+	var accuracy   := clampf(_aim_timer / maxf(0.001, _aim_duration), 0.0, 1.0)
+	var spread     := max_aim_spread * (1.0 - accuracy)
+	aim_pos += Vector3(randf_range(-spread, spread), 0.0, randf_range(-spread, spread))
 
 	var fire_sfx := AudioStreamPlayer3D.new()
 	fire_sfx.stream = _CANNON_FIRE_STREAM
