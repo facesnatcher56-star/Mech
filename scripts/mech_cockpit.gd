@@ -436,6 +436,8 @@ func _setup_dossier_presenter() -> void:
 	dossier_presenter.configure(self, canvas_layer)
 	_refresh_player_fire_controller()
 	_refresh_player_hit_response_controller()
+	if dossier_presenter.has_method("sync_view_visibility"):
+		dossier_presenter.sync_view_visibility(true)
 
 func _setup_player_damage_model() -> void:
 	player_damage_model = PLAYER_DAMAGE_MODEL.new()
