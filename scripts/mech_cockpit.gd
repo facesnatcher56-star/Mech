@@ -21,6 +21,10 @@ const COMBAT_VIEW_FLOW_CONTROLLER = preload("res://scripts/combat_view_flow_cont
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
 var is_dead: bool = false
+var _pre_enemy_cinematic_view_state: int = -1
+var _hit_during_enemy_cinematic: bool = false
+var _saved_aim_state: Dictionary = {}
+var _saved_aim_ray: Dictionary = {}
 
 var mouse_sensitivity: float = 0.002
 var sway_time: float = 0.0
@@ -500,6 +504,7 @@ func _setup_projectile_cinematic_controller() -> void:
 	})
 	projectile_cinematic_controller.shot_missed.connect(_on_projectile_cinematic_miss)
 	projectile_cinematic_controller.cinematic_ended.connect(_on_projectile_cinematic_end)
+	call_deferred("_connect_enemy_cinematic_ended")
 	_refresh_player_hit_response_controller()
 
 func _setup_player_fire_controller() -> void:
@@ -762,6 +767,12 @@ func _update_analog_camera_presentation(delta: float) -> void:
 func begin_enemy_fire_cinematic(fire_callable: Callable) -> void:
 	if get_tree().get_nodes_in_group("shell_in_flight").size() > 0:
 		return
+	_pre_enemy_cinematic_view_state = combat_view_flow_controller.combat_view_state if combat_view_flow_controller else -1
+	_hit_during_enemy_cinematic = false
+	if _pre_enemy_cinematic_view_state == CombatViewState.ANALOG_AIM_VIEW:
+		if analog_aim_solution_controller and analog_aim_solution_controller.has_method("save_state"):
+			_saved_aim_state = analog_aim_solution_controller.save_state()
+		_saved_aim_ray = last_ray_result.duplicate()
 	if combat_view_flow_controller:
 		combat_view_flow_controller.reset_to_normal(CombatViewState.NORMAL_VIEW)
 
@@ -912,10 +923,33 @@ func _start_weapon_reload() -> void:
 		reload_timer = 0.0
 		current_spread = max_spread
 
-func hit():
+func hit(body: Node = null):
+	_hit_during_enemy_cinematic = true
 	_refresh_player_hit_response_controller()
 	if player_hit_response_controller:
+		var hit_region := _classify_player_hit(body)
 		is_dead = player_hit_response_controller.apply_hit(camera, is_dead)
+		if not is_dead:
+			_apply_aim_disruption_on_hit(hit_region)
+
+func _classify_player_hit(body: Node) -> String:
+	if not body:
+		return "BODY"
+	var node_name := body.name.to_lower()
+	if "arm" in node_name or "shoulder" in node_name or "gun" in node_name:
+		return "ARM"
+	return "BODY"
+
+func _apply_aim_disruption_on_hit(region: String) -> void:
+	if not combat_view_flow_controller:
+		return
+	if combat_view_flow_controller.combat_view_state != CombatViewState.ANALOG_AIM_VIEW:
+		return
+	if region == "ARM":
+		_reset_analog_aim_solution()
+	else:
+		if analog_aim_solution_controller and analog_aim_solution_controller.has_method("disrupt_after_fire"):
+			analog_aim_solution_controller.disrupt_after_fire()
 
 func _on_player_destroyed(_snapshot: Dictionary) -> void:
 	is_dead = true
@@ -944,10 +978,30 @@ func _on_projectile_cinematic_miss(hit_pos: Vector3) -> void:
 	damage_number_script.display_text(hit_pos, "MISS", get_tree().current_scene, Color.ORANGE_RED)
 
 func _on_projectile_cinematic_end() -> void:
+	_clear_shell_flight_lock()
 	if combat_view_flow_controller:
 		combat_view_flow_controller.reset_to_normal(CombatViewState.NORMAL_VIEW)
 	if combat_bark_ui:
 		combat_bark_ui.hide_bark()
+
+func _on_enemy_fire_cinematic_end() -> void:
+	_clear_shell_flight_lock()
+	if not _hit_during_enemy_cinematic and _pre_enemy_cinematic_view_state == CombatViewState.ANALOG_AIM_VIEW and not is_dead:
+		if analog_aim_solution_controller and not _saved_aim_state.is_empty():
+			analog_aim_solution_controller.restore_state(_saved_aim_state)
+		if combat_view_flow_controller and combat_view_flow_controller.has_method("resume_analog_aim_view"):
+			combat_view_flow_controller.resume_analog_aim_view(CombatViewState.ANALOG_AIM_VIEW, _saved_aim_ray)
+		_pre_enemy_cinematic_view_state = -1
+		return
+	_pre_enemy_cinematic_view_state = -1
+
+func _connect_enemy_cinematic_ended() -> void:
+	if enemy_fire_cinematic_controller and enemy_fire_cinematic_controller.has_signal("cinematic_ended"):
+		enemy_fire_cinematic_controller.cinematic_ended.connect(_on_enemy_fire_cinematic_end)
+
+func _clear_shell_flight_lock() -> void:
+	for node in get_tree().get_nodes_in_group("shell_in_flight"):
+		node.remove_from_group("shell_in_flight")
 
 func _build_mesh_colliders() -> void:
 	var meshes: Array[MeshInstance3D] = []

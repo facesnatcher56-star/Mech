@@ -6,13 +6,14 @@ const EXPLOSION_SCENE = preload("res://scenes/explosion.tscn")
 ## Explosion scene spawned when the RPG resolves against anything.
 @export var explosion_scene: PackedScene = EXPLOSION_SCENE
 ## Time in seconds before the smoke trail is cleaned after impact.
-@export var smoke_cleanup_delay: float = 1.4
+@export var smoke_cleanup_delay: float = 5.0
 
 @onready var smoke_trail: GPUParticles3D = get_node_or_null("SmokeTrail")
 
 func _ready() -> void:
 	swept_collision_enabled = true
 	super._ready()
+	remove_from_group("shell_in_flight")
 	if smoke_trail:
 		smoke_trail.emitting = true
 

@@ -16,8 +16,12 @@ const _CANNON_FIRE_STREAM = preload("res://assets/Sounds/artillery-gunfire2.wav"
 @export var min_aim_time: float = 4.0
 ## Maximum seconds Zezlan holds aim before firing.
 @export var max_aim_time: float = 12.0
-## World-unit spread radius applied at minimum aim time (fully aimed = zero spread).
-@export var max_aim_spread: float = 6.0
+## Half-angle of the spread cone in degrees at minimum aim time (panic fire).
+@export var max_cone_angle_deg: float = 25.0
+## Seconds added to aim window when a leg (body) hit lands during aiming.
+@export var aim_extension_body_hit: float = 3.0
+## Seconds added to aim window when a torso (gun) hit lands during aiming.
+@export var aim_extension_torso_hit: float = 1.5
 
 @export_group("Zezlan Movement - Input")
 ## Hold this key to raise the target throttle.
@@ -218,7 +222,7 @@ func apply_rpg_structure_damage(damage: int, hit_pos: Vector3) -> Dictionary:
 	if structure_hp <= 0:
 		_destroy_zezlan()
 
-	damage_number_script.display_text(hit_pos + Vector3.UP * 0.75, "-%d RPG" % applied_damage, get_tree().current_scene, Color(1.0, 0.58, 0.16))
+	damage_number_script.display_text(hit_pos + Vector3.UP * 0.75, "-%d RPG" % applied_damage, get_tree().current_scene, Color(1.0, 0.58, 0.16), 28)
 
 	var snapshot := get_hp_snapshot()
 	hp_changed.emit(snapshot)
@@ -256,13 +260,15 @@ func _region_to_part_key(region: String) -> String:
 			return "torso"
 
 func _get_damage_for_region(region: String) -> int:
+	var base := 0
 	match region:
 		"TORSO":
-			return max(0, torso_hit_damage)
+			base = torso_hit_damage
 		"LEFT LEG", "RIGHT LEG":
-			return max(0, leg_hit_damage)
+			base = leg_hit_damage
 		_:
-			return max(0, fallback_hit_damage)
+			base = fallback_hit_damage
+	return maxi(1, roundi(base * randf_range(0.8, 1.2)))
 
 func _get_part_hp(region: String) -> int:
 	match region:
@@ -305,6 +311,15 @@ func _update_fire_timer(delta: float) -> void:
 		_fire_timer = fire_interval
 		_start_aiming()
 
+func apply_aim_disruption(region: String) -> void:
+	if not _is_aiming:
+		return
+	match region:
+		"TORSO":
+			_aim_duration += aim_extension_torso_hit
+		"LEFT LEG", "RIGHT LEG":
+			_aim_duration += aim_extension_body_hit
+
 func _start_aiming() -> void:
 	_is_aiming = true
 	_aim_timer = 0.0
@@ -341,9 +356,15 @@ func _launch_shell(player: Node3D) -> void:
 
 	var muzzle_pos := _get_muzzle_position()
 	var aim_pos    := player.global_position + Vector3.UP * aim_height_offset
-	var accuracy   := clampf(_aim_timer / maxf(0.001, _aim_duration), 0.0, 1.0)
-	var spread     := max_aim_spread * (1.0 - accuracy)
-	aim_pos += Vector3(randf_range(-spread, spread), 0.0, randf_range(-spread, spread))
+	var aim_range     := maxf(0.001, max_aim_time - min_aim_time)
+	var t             := clampf((_aim_timer - min_aim_time) / aim_range, 0.0, 1.0)
+	var accuracy      := t * t
+	var cone_half_rad := deg_to_rad(max_cone_angle_deg * (1.0 - accuracy))
+	var distance      := muzzle_pos.distance_to(aim_pos)
+	var cone_radius   := tan(cone_half_rad) * distance
+	var rand_r        := sqrt(randf()) * cone_radius
+	var rand_theta    := randf() * TAU
+	aim_pos += Vector3(rand_r * cos(rand_theta), 0.0, rand_r * sin(rand_theta))
 
 	var fire_sfx := AudioStreamPlayer3D.new()
 	fire_sfx.stream = _CANNON_FIRE_STREAM

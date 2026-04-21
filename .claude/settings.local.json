@@ -2,7 +2,18 @@
   "permissions": {
     "allow": [
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(xargs ls *)",
+      "Bash(python3 -c ' *)",
+      "Bash(node *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(python3 -c \" import json, struct with open\\('/c/Users/lloyd/OneDrive/Documents/new-mech/new-mech/assets/prefabs/zezlan.glb','rb'\\) as f: magic = f.read\\(4\\) ver = struct.unpack\\('<I', f.read\\(4\\)\\)[0] length = struct.unpack\\('<I', f.read\\(4\\)\\)[0] chunk_len = struct.unpack\\('<I', f.read\\(4\\)\\)[0] chunk_type = f.read\\(4\\) json_data = json.loads\\(f.read\\(chunk_len\\)\\) nodes = json_data.get\\('nodes', []\\) for n in nodes: print\\(n.get\\('name','?'\\)\\) \")",
+      "Bash(git checkout *)",
+      "Bash(git stash *)",
+      "Bash(grep -v \"^+$\")",
+      "Bash(wc -l /home/deck/new-mech/scripts/*.gd)",
+      "Bash(git --version)"
     ]
   }
 }

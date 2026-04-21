@@ -338,14 +338,17 @@ func _update_visible_dossier(line: String, target: Node3D, snapshot: Dictionary 
 	var current_scene := get_tree().current_scene
 	if not current_scene:
 		return
-	var dossier = current_scene.find_child("TargetDossierUI", true, false)
-	if not dossier or not dossier.visible or not dossier.has_method("show_impact_line"):
-		return
 	if snapshot.is_empty():
 		var damage_model := _find_rpg_damage_model(target)
 		if damage_model and damage_model.has_method("get_hp_snapshot"):
 			snapshot = damage_model.get_hp_snapshot()
-	dossier.show_impact_line(line, "structure", snapshot)
+	var dossier = current_scene.find_child("TargetDossierUI", true, false)
+	if dossier and dossier.visible and dossier.has_method("show_impact_line"):
+		dossier.show_impact_line(line, "structure", snapshot)
+		return
+	var reload_ui = current_scene.find_child("EnemyReloadUI", true, false)
+	if reload_ui and reload_ui.visible and reload_ui.has_method("show_impact_line"):
+		reload_ui.show_impact_line(line, "structure", snapshot)
 
 func _find_crew_order_ui() -> void:
 	var current_scene := get_tree().current_scene

@@ -144,7 +144,7 @@ func _resolve_hit(body, hit_pos: Vector3, source: String) -> void:
 			if collision_debug_enabled:
 				print("[SHELL TRACE] resolve source=", source, " target_method_node=", target.name, " hit_pos=", _fmt_vec(hit_pos))
 			if target.has_method("hit"):
-				target.hit()
+				target.hit(body)
 			else:
 				target.part_hit()
 			break

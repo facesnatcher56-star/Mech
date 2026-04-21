@@ -8,7 +8,7 @@ var is_destroyed: bool = false
 var spark_timer: Timer
 var damage_number_script = preload("res://scripts/damage_number.gd")
 
-func hit():
+func hit(_body: Node = null):
 	if is_destroyed: return
 	
 	print(part_name + " HIT!")

@@ -130,6 +130,22 @@ func enter_analog_aim_view(analog_aim_state: int, last_ray_result: Dictionary = 
 	targeting_drift_changed.emit(current_analog_drift_multiplier)
 	targeting_stroke_reset_requested.emit()
 
+func resume_analog_aim_view(analog_aim_state: int, last_ray_result: Dictionary = {}) -> void:
+	combat_view_state = analog_aim_state
+	if _player_camera:
+		_player_camera.current = false
+	if _cinematic_camera:
+		_cinematic_camera.current = true
+	analog_hud_visibility_changed.emit(true)
+	analog_heartbeat_play_requested.emit()
+	target_dossier_show_requested.emit()
+	aim_camera_session_start = _cinematic_camera.global_position if _cinematic_camera else Vector3.ZERO
+	aim_camera_session_target = _get_analog_camera_target_point(last_ray_result)
+	aim_camera_chunk_stage = 0
+	if _aim_solution:
+		current_analog_drift_multiplier = _aim_solution.get_stage_drift_multiplier()
+	targeting_drift_changed.emit(current_analog_drift_multiplier)
+
 func return_to_fire_cam_then_fire(shot_lock: Dictionary, firing_state: int, return_time: float) -> void:
 	if not _fire_cam or not _cinematic_camera:
 		return

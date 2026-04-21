@@ -29,10 +29,13 @@ func _process(delta):
 	if time_passed >= duration:
 		queue_free()
 
-static func display_text(pos: Vector3, label_text: String, parent: Node, color: Color = Color.YELLOW):
+static func display_text(pos: Vector3, label_text: String, parent: Node, color: Color = Color.YELLOW, size: int = 0):
 	var label = load("res://scripts/damage_number.gd").new()
 	label.text = label_text
 	label.modulate = color
+	if size > 0:
+		label.font_size = size
+		label.outline_size = size / 4
 	parent.add_child(label)
 	label.global_position = pos
 	return label

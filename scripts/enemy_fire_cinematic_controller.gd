@@ -1,5 +1,7 @@
 extends Node
 
+signal cinematic_ended
+
 @export_group("Cinematic Timing")
 ## Time to hold on the enemy camera before firing.
 @export var pre_fire_hold: float = 2.0
@@ -156,6 +158,7 @@ func end() -> void:
 	
 	active_shell = null
 	selected_action_cam = null
+	cinematic_ended.emit()
 
 func is_active() -> bool:
 	return active

@@ -125,6 +125,12 @@ func _on_shell_hit(body: Node, hit_pos: Vector3) -> void:
 		if not damage_result.is_empty() and str(damage_result.get("part_key", "")) != "":
 			bark_part_name = str(damage_result.get("part_key", ""))
 
+	if is_enemy and damage_result.get("applied", false):
+		var region := str(damage_result.get("region", ""))
+		var dm: Node = dossier_presenter.find_damage_model_node(body) if dossier_presenter else null
+		if dm and dm.has_method("apply_aim_disruption"):
+			dm.apply_aim_disruption(region)
+
 	if is_enemy and hit_sound:
 		hit_sound.global_position = hit_pos
 		hit_sound.play()

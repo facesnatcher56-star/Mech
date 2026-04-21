@@ -67,7 +67,6 @@ particles_anim_loop = false
 [sub_resource type="QuadMesh" id="QuadMesh_smoke"]
 material = SubResource("StandardMaterial3D_yc10j")
 
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bark"]
 bg_color = Color(0, 0, 0, 0.85)
 border_width_left = 2
@@ -259,7 +258,6 @@ transform = Transform3D(0.91616416, -0.3997972, -0.028380089, 0.39979723, 0.9065
 
 [node name="RightFoot" parent="WIPtestmech/Armature/TorsoLowerR/LegR/FootR" index="0" unique_id=1107744312]
 transform = Transform3D(0.15202108, -0.4955742, -0.8551586, -0.027088383, -0.8669786, 0.49760884, -0.9880061, -0.052482143, -0.14522335, 0.0025524963, -0.0475505, 0.04030769)
-
 
 [node name="SideCamMortarSound" type="AudioStreamPlayer" parent="WIPtestmech" unique_id=39001304]
 stream = ExtResource("11_miss_sound")

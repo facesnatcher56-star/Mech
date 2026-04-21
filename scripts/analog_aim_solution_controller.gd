@@ -157,3 +157,20 @@ func _array_value(values: Array, one_based_stage: int, fallback: float) -> float
 		return fallback
 	var index = clampi(one_based_stage - 1, 0, values.size() - 1)
 	return float(values[index])
+
+func save_state() -> Dictionary:
+	return {
+		"aim_settle": aim_settle,
+		"solution_stage": solution_stage,
+		"zoom_stage": zoom_stage,
+		"camera_stage_elapsed": camera_stage_elapsed,
+		"fire_recovery": fire_recovery,
+	}
+
+func restore_state(state: Dictionary) -> void:
+	aim_settle = float(state.get("aim_settle", 0.09))
+	solution_stage = int(state.get("solution_stage", 1))
+	zoom_stage = int(state.get("zoom_stage", 1))
+	camera_stage_elapsed = float(state.get("camera_stage_elapsed", 0.0))
+	fire_recovery = float(state.get("fire_recovery", 0.0))
+	_update_solution_stage()

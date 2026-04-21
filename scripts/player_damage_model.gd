@@ -51,8 +51,9 @@ func apply_hit() -> Dictionary:
 			"snapshot": get_hp_snapshot()
 		}
 
-	structure_hp = maxi(0, structure_hp - hit_damage)
-	torso_hp = maxi(0, torso_hp - hit_damage)
+	var actual_damage := maxi(1, roundi(hit_damage * randf_range(0.8, 1.2)))
+	structure_hp = maxi(0, structure_hp - actual_damage)
+	torso_hp = maxi(0, torso_hp - actual_damage)
 	damage_flash_timer = 2.0
 
 	if structure_hp <= 0 or torso_hp <= 0:
@@ -65,7 +66,7 @@ func apply_hit() -> Dictionary:
 
 	return {
 		"applied": true,
-		"damage": hit_damage,
+		"damage": actual_damage,
 		"part_key": "torso",
 		"destroyed": is_dead,
 		"snapshot": snapshot

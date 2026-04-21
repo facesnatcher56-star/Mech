@@ -115,8 +115,11 @@ func _draw() -> void:
 		structure = snapshot["structure"]
 	var str_ratio := clampf(float(structure.get("current", 100)) / float(maxi(1, int(structure.get("max", 100)))), 0.0, 1.0)
 	var str_bar := Rect2(14, 52, panel_size.x - 28, 5)
+	var str_col := _bar_color(str_ratio, false)
+	if flash_timer > 0.0 and flash_part_key == "structure":
+		str_col = str_col.lerp(flash_color, 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.03))
 	draw_rect(str_bar, Color(0.02, 0.025, 0.02, 1.0), true)
-	draw_rect(Rect2(str_bar.position, Vector2(str_bar.size.x * str_ratio, str_bar.size.y)), _bar_color(str_ratio, false), true)
+	draw_rect(Rect2(str_bar.position, Vector2(str_bar.size.x * str_ratio, str_bar.size.y)), str_col, true)
 	draw_line(Vector2(12, 59), Vector2(panel_size.x - 12, 59), border_color.darkened(0.5), 1.0)
 
 	# Silhouette part data
@@ -200,6 +203,10 @@ func _draw_minimal(font: Font, rect: Rect2) -> void:
 	draw_rect(bar_r, Color(0.02, 0.025, 0.02, 1.0), true)
 	draw_rect(Rect2(bar_r.position, Vector2(bar_r.size.x * rl_prog, bar_r.size.y)), rl_col, true)
 	draw_rect(bar_r, border_color.darkened(0.4), false, 1.0)
+
+	if flash_timer > 0.0:
+		var imp_col := flash_color.lerp(Color.WHITE, 0.3 * sin(Time.get_ticks_msec() * 0.03))
+		draw_string(font, Vector2(14, panel_size.y - 6), latest_impact, HORIZONTAL_ALIGNMENT_LEFT, panel_size.x - 28, 10, imp_col)
 
 func _get_part(parts: Dictionary, key: String) -> Dictionary:
 	if parts.has(key) and parts[key] is Dictionary:

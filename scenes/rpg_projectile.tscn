@@ -51,7 +51,7 @@ mesh = SubResource("CapsuleMesh_rocket")
 [node name="SmokeTrail" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.42)
 amount = 80
-lifetime = 1.1
+lifetime = 3.5
 local_coords = false
 process_material = SubResource("ParticleProcessMaterial_smoke")
 draw_pass_1 = SubResource("QuadMesh_smoke")
