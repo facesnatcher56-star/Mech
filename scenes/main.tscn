@@ -19,7 +19,7 @@
 [ext_resource type="Script" uid="uid://cthmffaqbefjg" path="res://scripts/crew_soldier.gd" id="21_crew_soldier"]
 [ext_resource type="Script" uid="uid://c0y2se45h5trx" path="res://scripts/crew_order_ui.gd" id="22_crew_order_ui"]
 [ext_resource type="Script" uid="uid://ci0g6b45ktuvb" path="res://scripts/firing_sequence_camera.gd" id="23_firing_seq_cam"]
-[ext_resource type="PackedScene" path="res://scenes/smoke_screen.tscn" id="24_smoke_screen"]
+[ext_resource type="PackedScene" uid="uid://dg3g6k7y1p2q" path="res://scenes/smoke_screen.tscn" id="24_smoke_screen"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_ref"]
 radius = 0.1
@@ -125,6 +125,139 @@ _data = {
 &"RESET": SubResource("Animation_0ld40")
 }
 
+[sub_resource type="Animation" id="Animation_gqmmt"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("WIPtestmech/Armature/Torso2/TorsoR/ShoulderR:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(-0.07377368, 0.014869168, 1.2641937)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0.9691914, -1.2099631, -1.4887013)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm/RightArm:rotation")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(-0.7371845, -1.0121437, -1.2261645)]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("WIPtestmech/Armature/Torso2:rotation")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(-0.057365447, 0, 0)]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("WIPtestmech/Armature/TorsoLowerR/LegR:rotation")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(-1.5350097, -0.047150247, 0.13617267)]
+}
+
+[sub_resource type="Animation" id="Animation_yc10j"]
+resource_name = "WalkF"
+length = 2.0
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("WIPtestmech/Armature/Torso2/TorsoR/ShoulderR:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1.1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(-0.07377368, 0.014869168, 1.2641937), Vector3(-0.066312544, 0.121663444, 1.2288785)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0.9691914, -1.2099631, -1.4887013)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm/RightArm:rotation")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(-0.7371845, -1.0121437, -1.2261645)]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("WIPtestmech/Armature/Torso2:rotation")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 1.2),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(-0.057365447, 0, 0), Vector3(-0.05736546, 0.10428343, 0)]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("WIPtestmech/Armature/TorsoLowerR/LegR:rotation")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 2),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(-1.5350097, -0.047150247, 0.13617267), Vector3(-1.4672719, 3.0655231, -2.2903337)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_jscy8"]
+_data = {
+&"RESET": SubResource("Animation_gqmmt"),
+&"WalkF": SubResource("Animation_yc10j")
+}
+
 [node name="Main" type="Node3D" unique_id=2077343884]
 
 [node name="REF_Alpha" type="Marker3D" parent="." unique_id=1714902305]
@@ -183,6 +316,7 @@ unit_size = 50.0
 transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 27.274748, 3.625, -13.861531)
 script = ExtResource("2_script")
 firecam_duration = 0.2
+projectile_speed = 250.0
 impact_side_camera_trigger_distance = 60.0
 impact_side_camera_time_scale = 0.6
 aim_camera_stage_1_time = 3.0
@@ -214,13 +348,16 @@ smoke_scale = 3.0
 particle_amount = 40
 
 [node name="Torso2" parent="WIPtestmech/Armature" parent_id_path=PackedInt32Array(1679724251, 359783737) index="1" unique_id=654991229]
-transform = Transform3D(0.99999976, 0, 0, 0, 0.998355, 0.05733398, 0, -0.057333983, 0.9983549, 0.28354645, -0.09670848, -0.78216624)
+transform = Transform3D(0.99999976, 0, 0, 0, 0.99835485, 0.057333987, 0, -0.05733398, 0.998355, 0.28354645, -0.09670848, -0.78216624)
 
 [node name="ShoulderR" parent="WIPtestmech/Armature/Torso2/TorsoR" parent_id_path=PackedInt32Array(1679724251, 1891064601) index="0" unique_id=696837719]
-transform = Transform3D(0.30074325, -0.95358944, 0.014828171, 0.950771, 0.30100042, 0.07370676, -0.074749306, -0.008068616, 0.9971695, 0, 0.45996046, 0)
+transform = Transform3D(0.3007431, -0.95358926, 0.01482817, 0.95077056, 0.3010004, 0.073706746, -0.074749276, -0.008068613, 0.9971692, 5.9604645e-08, 0.45995998, 1.1920929e-07)
 
-[node name="RightArm" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm" parent_id_path=PackedInt32Array(1679724251, 914604739) index="0" unique_id=1710989070]
-transform = Transform3D(-0.35741854, 0.6914562, -0.62780714, -0.6968309, 0.25013238, 0.67220604, 0.6218356, 0.67773414, 0.39242592, -0.015673876, -0.059205055, 0.003597021)
+[node name="GunArm" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR" index="0" unique_id=914604739]
+transform = Transform3D(0.7976911, 0.28861302, -0.5295198, -0.5640602, 0.046410825, -0.8244283, -0.2133653, 0.95632035, 0.19981664, -2.6077032e-08, 0.2282031, -3.259629e-08)
+
+[node name="RightArm" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm" index="0" unique_id=1710989070]
+transform = Transform3D(-0.35741854, 0.6914562, -0.62780684, -0.6968308, 0.25013235, 0.67220634, 0.6218356, 0.6777342, 0.39242578, -0.015673876, -0.059205055, 0.003597021)
 
 [node name="CannonSound" type="AudioStreamPlayer3D" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR/GunArm/RightArm" index="0" unique_id=1645744782]
 transform = Transform3D(0.19999991, -9.536732e-09, 1.6689295e-08, 3.979037e-15, 0.1999999, -3.3378594e-08, -2.3841848e-08, 3.3378594e-08, 0.19999999, -0.21446657, -0.07303512, 0.42657733)
@@ -252,7 +389,7 @@ transform = Transform3D(0.41181862, 0.895979, 0.16621366, -0.87424207, 0.3369958
 transform = Transform3D(0.05258519, 0.108316615, 0.9927272, 0.054754585, -0.99291766, 0.10543757, 0.99712676, 0.04881119, -0.058142994, 0, 0.28172442, -4.7683716e-07)
 
 [node name="LegR" parent="WIPtestmech/Armature/TorsoLowerR" parent_id_path=PackedInt32Array(1679724251, 583431586) index="0" unique_id=1696298831]
-transform = Transform3D(0.996036, -0.08893478, -0.0016863616, 0.0048570717, 0.035447735, 0.99935967, -0.088818066, -0.99540645, 0.03573918, 4.7683716e-07, 0.25640345, -5.9604645e-08)
+transform = Transform3D(0.9960359, -0.08893476, -0.0016863609, 0.0048570707, 0.035447728, 0.9993596, -0.08881806, -0.9954062, 0.03573918, 4.7683716e-07, 0.25640202, -1.1920929e-07)
 
 [node name="FootR" parent="WIPtestmech/Armature/TorsoLowerR/LegR" index="0" unique_id=776964756]
 transform = Transform3D(0.91616416, -0.3997972, -0.028380089, 0.39979723, 0.90655696, 0.13533881, -0.02837991, -0.13533884, 0.9903928, 2.3841858e-07, 0.2732985, 0)
@@ -576,6 +713,9 @@ transform = Transform3D(0.9448918, 0, 0.32738283, 0, 1, 0, -0.32738283, 0, 0.944
 
 [node name="SmokeScreen" parent="." unique_id=520909910 instance=ExtResource("24_smoke_screen")]
 transform = Transform3D(0.01183311, 0, 0.99992996, 0, 1, 0, -0.99992996, 0, 0.01183311, 31, 1.5, 70)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=2003300415]
+libraries/ = SubResource("AnimationLibrary_jscy8")
 
 [editable path="WIPtestmech"]
 [editable path="zezlan"]

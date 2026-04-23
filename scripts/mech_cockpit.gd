@@ -589,8 +589,16 @@ func _input(event):
 	if not _is_player_view_current():
 		return
 
+	if event.is_action_pressed("ui_accept"):
+		fire_cannon()
+		return
+
 	# Smooth Zoom Input
 	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			fire_cannon()
+			return
+			
 		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			_begin_aim_flow()
 			return
@@ -674,9 +682,6 @@ func _process(delta):
 	if analog_reticle_hud:
 		# Range info is handled by the analog HUD now
 		pass
-
-	if _is_player_view_current() and Input.is_action_just_pressed("ui_accept"):
-		fire_cannon()
 
 func _is_player_view_current() -> bool:
 	return (camera != null and camera.current) or (cinematic_camera != null and cinematic_camera.current)
