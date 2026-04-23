@@ -102,7 +102,7 @@ func _setup_self_dossier_ui() -> void:
 	self_dossier_ui = TARGET_DOSSIER_UI.new()
 	self_dossier_ui.name = "SelfDossierUI"
 	self_dossier_ui.anchor_corner = TARGET_DOSSIER_UI.AnchorCorner.TOP_LEFT
-	self_dossier_ui.display_scale = 0.65
+	self_dossier_ui.display_scale = 0.40
 	self_dossier_ui.custom_offset_x = -21.0
 	self_dossier_ui.custom_offset_y = -21.0
 	canvas_layer.add_child(self_dossier_ui)
@@ -125,7 +125,7 @@ func _setup_enemy_reload_ui() -> void:
 	enemy_reload_ui.minimal_mode = true
 	enemy_reload_ui.anchor_corner = TARGET_DOSSIER_UI.AnchorCorner.TOP_RIGHT
 	enemy_reload_ui.panel_size = Vector2(210.0, 54.0)
-	enemy_reload_ui.display_scale = 0.75
+	enemy_reload_ui.display_scale = 1.0
 	enemy_reload_ui.custom_offset_x = -4.0
 	enemy_reload_ui.custom_offset_y = 4.0
 	canvas_layer.add_child(enemy_reload_ui)

@@ -1,0 +1,31 @@
+[gd_scene load_steps=6 format=3 uid="uid://dg3g6k7y1p2q"]
+
+[ext_resource type="Script" uid="uid://b0x7n7y5p2q1" path="res://scripts/smoke_screen.gd" id="1_script"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_1"]
+noise_type = 3
+frequency = 0.02
+fractal_type = 2
+
+[sub_resource type="NoiseTexture3D" id="NoiseTexture3D_1"]
+width = 64
+height = 64
+depth = 64
+seamless = true
+noise = SubResource("FastNoiseLite_1")
+
+[sub_resource type="FogMaterial" id="FogMaterial_1"]
+density = 2.5
+albedo = Color(0.4, 0.38, 0.35, 1)
+emission = Color(0.1, 0.1, 0.1, 1)
+height_falloff = 0.2
+edge_fade = 0.1
+density_texture = SubResource("NoiseTexture3D_1")
+
+[node name="SmokeScreen" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="FogVolume" type="FogVolume" parent="."]
+size = Vector3(100, 20, 40)
+shape = 0
+material = SubResource("FogMaterial_1")

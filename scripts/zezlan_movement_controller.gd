@@ -116,6 +116,7 @@ var torso_hp: int = 60
 var left_leg_hp: int = 40
 var right_leg_hp: int = 40
 var is_destroyed: bool = false
+var _smoke_deployed: bool = false
 var _broken_parts := {}
 var damage_number_script = preload("res://scripts/damage_number.gd")
 
@@ -159,6 +160,9 @@ func apply_shell_damage(hit_body: Node, hit_pos: Vector3) -> Dictionary:
 	match region:
 		"TORSO":
 			torso_hp = maxi(0, torso_hp - damage)
+			if not _smoke_deployed and torso_hp <= max_torso_hp * 0.5:
+				_smoke_deployed = true
+				_deploy_smoke_screen()
 		"LEFT LEG":
 			left_leg_hp = maxi(0, left_leg_hp - damage)
 		"RIGHT LEG":
@@ -530,3 +534,12 @@ func _get_mesh_world_aabb(mesh_instance: MeshInstance3D) -> AABB:
 
 func _fmt_vec(value: Vector3) -> String:
 	return "(%.2f, %.2f, %.2f)" % [value.x, value.y, value.z]
+
+func _deploy_smoke_screen() -> void:
+	var smoke = get_tree().current_scene.find_child("SmokeScreen", true, false)
+	if smoke and smoke.has_method("deploy"):
+		smoke.deploy()
+	
+	var bark_ui = get_tree().current_scene.find_child("CombatBarkUI", true, false)
+	if bark_ui and bark_ui.has_method("show_smoke_alert"):
+		bark_ui.show_smoke_alert()

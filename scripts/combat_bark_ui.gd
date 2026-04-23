@@ -4,6 +4,8 @@ extends Control
 @onready var label = $Panel/Label
 @onready var name_label = $Panel/NameLabel
 
+var is_high_priority_active: bool = false
+
 var commit_lines = [
 	"Fire.", "Send it.", "Take this.", "Let it fly.", 
 	"Fire for effect.", "Range is good. Fire.", "Send the round.", "On my mark—fire."
@@ -34,15 +36,40 @@ var zezlan_taunts = [
 	"Had enough, Zezlan?", "Zezlan's armor is failing!"
 ]
 
+var smoke_alert_lines = [
+	"Zezlan's dumping coolant! He's trying to bleed the block, don't let him reset!",
+	"He's purging the manifold! If he clears those lines, he gets his leg back!",
+	"Smoke on the deck! I hear his pumps cycling, he's unjamming the breech!",
+	"He's blowing the valves! Target is stationary and trying to re-prime his hydraulics!",
+	"Coolant flush! Zezlan's down, but he's trying to cycle the pressure—hit him now!"
+]
+
 func _ready():
 	visible = false
 	modulate.a = 0.0
 
+func show_smoke_alert():
+	# Temporarily anchor to top-center
+	is_high_priority_active = true
+	set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_KEEP_SIZE, 40)
+	label.text = smoke_alert_lines.pick_random()
+	_fade_in()
+	
+	# Auto-hide after 5 seconds and reset position
+	get_tree().create_timer(5.0).timeout.connect(func():
+		_fade_out()
+		await get_tree().create_timer(0.3).timeout
+		is_high_priority_active = false
+		set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_KEEP_SIZE, 40)
+	)
+
 func show_commit():
+	if is_high_priority_active: return
 	label.text = commit_lines.pick_random()
 	_fade_in()
 
 func show_result(is_hit: bool, body_part_name: String = ""):
+	if is_high_priority_active: return
 	if not is_hit:
 		label.text = miss_lines.pick_random()
 	else:
