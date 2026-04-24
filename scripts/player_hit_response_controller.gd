@@ -18,13 +18,13 @@ func refresh_runtime_refs(config: Dictionary) -> void:
 	projectile_cinematic_controller = config.get("projectile_cinematic_controller", projectile_cinematic_controller)
 	dossier_presenter = config.get("dossier_presenter", dossier_presenter)
 
-func apply_hit(camera: Camera3D, current_is_dead: bool) -> bool:
+func apply_hit(camera: Camera3D, current_is_dead: bool, region: String = "BODY") -> bool:
 	if current_is_dead:
 		return true
 	if not player_damage_model or not player_damage_model.has_method("apply_hit"):
 		return current_is_dead
 
-	var damage_result: Dictionary = player_damage_model.apply_hit()
+	var damage_result: Dictionary = player_damage_model.apply_hit(region)
 	if not bool(damage_result.get("applied", false)):
 		return bool(damage_result.get("destroyed", current_is_dead))
 
@@ -49,7 +49,17 @@ func _show_player_hit(damage_result: Dictionary) -> void:
 	var snapshot = damage_result.get("snapshot", {})
 	if snapshot.is_empty() and player_damage_model and player_damage_model.has_method("get_hp_snapshot"):
 		snapshot = player_damage_model.get_hp_snapshot()
-	dossier_presenter.show_player_hit(str(damage_result.get("part_key", "torso")), snapshot)
+	
+	var is_crit := bool(damage_result.get("is_crit", false))
+	var part_key := str(damage_result.get("part_key", "torso"))
+	var damage := int(damage_result.get("damage", 0))
+	
+	var line := "HIT! -%d" % damage
+	if is_crit:
+		line = "CRIT! -%d" % damage
+		part_key = "torso" # Flash torso for crit hits
+
+	dossier_presenter.show_player_hit(part_key, snapshot, line)
 
 func _abort_outgoing_cinematic() -> void:
 	if projectile_cinematic_controller and projectile_cinematic_controller.has_method("is_active"):

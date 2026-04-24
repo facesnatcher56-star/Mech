@@ -91,6 +91,35 @@ func part_destroyed(part: Node3D) -> void:
 	if part.is_vital:
 		destroy_completely()
 
+func apply_rpg_structure_damage(damage: int, hit_pos: Vector3, hit_body: Node = null) -> Dictionary:
+	if is_destroyed:
+		return {"applied": false, "snapshot": get_hp_snapshot()}
+	
+	# If we hit a specific part body, destroy it
+	if hit_body and hit_body.has_method("hit"):
+		hit_body.hit()
+	elif hit_body and hit_body.get_parent().has_method("hit"):
+		hit_body.get_parent().hit()
+	
+	# Basic enemy_mech doesn't have structure HP, so we just return a fake snapshot for UI compatibility
+	return {
+		"applied": true,
+		"damage": damage,
+		"region": "STRUCTURE",
+		"part_key": "structure",
+		"destroyed": is_destroyed,
+		"snapshot": get_hp_snapshot()
+	}
+
+func get_hp_snapshot() -> Dictionary:
+	return {
+		"name": "ENEMY MECH",
+		"structure": {"current": 0 if is_destroyed else 100, "max": 100},
+		"parts": {},
+		"reload": {"progress": 1.0, "label": "CANNON", "aiming": false},
+		"destroyed": is_destroyed
+	}
+
 func destroy_completely() -> void:
 	if is_destroyed:
 		return

@@ -1,6 +1,5 @@
 extends Node
 
-var max_structure_hp: int = 60
 var max_torso_hp: int = 40
 var max_left_arm_hp: int = 25
 var max_right_arm_hp: int = 25
@@ -10,7 +9,6 @@ var hit_damage: int = 20
 
 var is_dead: bool = false
 var damage_flash_timer: float = 0.0
-var structure_hp: int = 0
 var torso_hp: int = 0
 var left_arm_hp: int = 0
 var right_arm_hp: int = 0
@@ -21,7 +19,6 @@ signal damaged(snapshot: Dictionary)
 signal destroyed(snapshot: Dictionary)
 
 func configure(config: Dictionary) -> void:
-	max_structure_hp = max(0, int(config.get("max_structure_hp", max_structure_hp)))
 	max_torso_hp = max(0, int(config.get("max_torso_hp", max_torso_hp)))
 	max_left_arm_hp = max(0, int(config.get("max_left_arm_hp", max_left_arm_hp)))
 	max_right_arm_hp = max(0, int(config.get("max_right_arm_hp", max_right_arm_hp)))
@@ -32,7 +29,6 @@ func configure(config: Dictionary) -> void:
 func reset() -> void:
 	is_dead = false
 	damage_flash_timer = 0.0
-	structure_hp = max_structure_hp
 	torso_hp = max_torso_hp
 	left_arm_hp = max_left_arm_hp
 	right_arm_hp = max_right_arm_hp
@@ -43,7 +39,7 @@ func update(delta: float) -> void:
 	if damage_flash_timer > 0.0:
 		damage_flash_timer = max(0.0, damage_flash_timer - delta)
 
-func apply_hit() -> Dictionary:
+func apply_hit(region: String = "BODY") -> Dictionary:
 	if is_dead:
 		return {
 			"applied": false,
@@ -51,12 +47,17 @@ func apply_hit() -> Dictionary:
 			"snapshot": get_hp_snapshot()
 		}
 
+	var is_crit := (region == "WEAK SPOT")
 	var actual_damage := maxi(1, roundi(hit_damage * randf_range(0.8, 1.2)))
-	structure_hp = maxi(0, structure_hp - actual_damage)
+	
+	if is_crit:
+		actual_damage *= 2
+
 	torso_hp = maxi(0, torso_hp - actual_damage)
 	damage_flash_timer = 2.0
 
-	if structure_hp <= 0 or torso_hp <= 0:
+	var legs_destroyed := (left_leg_hp <= 0 and right_leg_hp <= 0)
+	if torso_hp <= 0 or legs_destroyed:
 		is_dead = true
 
 	var snapshot := get_hp_snapshot()
@@ -68,6 +69,7 @@ func apply_hit() -> Dictionary:
 		"applied": true,
 		"damage": actual_damage,
 		"part_key": "torso",
+		"is_crit": is_crit,
 		"destroyed": is_dead,
 		"snapshot": snapshot
 	}
@@ -75,7 +77,6 @@ func apply_hit() -> Dictionary:
 func get_hp_snapshot() -> Dictionary:
 	return {
 		"name": "PLAYER",
-		"structure": {"current": structure_hp, "max": max_structure_hp},
 		"parts": {
 			"torso":     {"label": "TORSO",   "current": torso_hp,     "max": max_torso_hp,     "broken": torso_hp <= 0},
 			"left_arm":  {"label": "L ARM",   "current": left_arm_hp,  "max": max_left_arm_hp,  "broken": left_arm_hp <= 0},

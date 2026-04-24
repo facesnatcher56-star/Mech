@@ -109,19 +109,6 @@ func _draw() -> void:
 	draw_string(font, Vector2(14, 20), "TARGET DOSSIER", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, muted_text_color)
 	draw_string(font, Vector2(14, 44), target_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, text_color)
 
-	# Structure bar (thin, under header)
-	var structure: Dictionary = {"current": 100, "max": 100}
-	if snapshot.has("structure") and snapshot["structure"] is Dictionary:
-		structure = snapshot["structure"]
-	var str_ratio := clampf(float(structure.get("current", 100)) / float(maxi(1, int(structure.get("max", 100)))), 0.0, 1.0)
-	var str_bar := Rect2(14, 52, panel_size.x - 28, 5)
-	var str_col := _bar_color(str_ratio, false)
-	if flash_timer > 0.0 and flash_part_key == "structure":
-		str_col = str_col.lerp(flash_color, 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.03))
-	draw_rect(str_bar, Color(0.02, 0.025, 0.02, 1.0), true)
-	draw_rect(Rect2(str_bar.position, Vector2(str_bar.size.x * str_ratio, str_bar.size.y)), str_col, true)
-	draw_line(Vector2(12, 59), Vector2(panel_size.x - 12, 59), border_color.darkened(0.5), 1.0)
-
 	# Silhouette part data
 	var parts: Dictionary = {}
 	if snapshot.has("parts") and snapshot["parts"] is Dictionary:

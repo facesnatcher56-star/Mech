@@ -139,7 +139,7 @@ func _resolve_hit(body, hit_pos: Vector3, source: String) -> void:
 			if target.has_method("hit"):
 				target.hit(body)
 			else:
-				target.part_hit()
+				target.part_hit(body)
 			break
 		target = target.get_parent()
 	if collision_debug_enabled and target == null:

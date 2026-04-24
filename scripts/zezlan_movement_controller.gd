@@ -86,13 +86,9 @@ const _CANNON_FIRE_STREAM = preload("res://assets/Sounds/artillery-gunfire2.wav"
 @export var collision_debug_log_each_collider: bool = true
 
 @export_group("Zezlan HP")
-## Total enemy structure pool shown in the target dossier.
-@export var max_structure_hp: int = 100
 ## Torso armor pool. Reaching zero destroys Zezlan.
 @export var max_torso_hp: int = 60
-## Left leg armor pool. Reaching zero marks the leg broken in the UI only.
 @export var max_left_leg_hp: int = 40
-## Right leg armor pool. Reaching zero marks the leg broken in the UI only.
 @export var max_right_leg_hp: int = 40
 ## Damage applied to total structure and torso on torso hits.
 @export var torso_hit_damage: int = 18
@@ -111,12 +107,10 @@ var current_travel_speed: float = 0.0
 var current_animation_speed: float = 0.0
 var braking_to_stop: bool = false
 var animation_player: AnimationPlayer
-var structure_hp: int = 100
 var torso_hp: int = 60
 var left_leg_hp: int = 40
 var right_leg_hp: int = 40
 var is_destroyed: bool = false
-var _smoke_deployed: bool = false
 var _broken_parts := {}
 var damage_number_script = preload("res://scripts/damage_number.gd")
 
@@ -134,12 +128,14 @@ func _ready() -> void:
 		animation_player.speed_scale = 0.0
 
 func _reset_hp_pools() -> void:
-	structure_hp = max(0, max_structure_hp)
 	torso_hp = max(0, max_torso_hp)
 	left_leg_hp = max(0, max_left_leg_hp)
 	right_leg_hp = max(0, max_right_leg_hp)
 	is_destroyed = false
 	_broken_parts.clear()
+
+func part_hit(body: Node = null) -> void:
+	apply_shell_damage(body, global_position + Vector3.UP * 1.5)
 
 func apply_shell_damage(hit_body: Node, hit_pos: Vector3) -> Dictionary:
 	if is_destroyed:
@@ -154,28 +150,37 @@ func apply_shell_damage(hit_body: Node, hit_pos: Vector3) -> Dictionary:
 	var region := _get_hit_region(hit_body)
 	var part_key := _region_to_part_key(region)
 	var damage := _get_damage_for_region(region)
+	var is_crit := (region == "WEAK SPOT")
+	if is_crit:
+		damage *= 2
+		region = "TORSO" # Redirect weak spot damage to torso
+		part_key = "torso"
+
 	var before_part_hp := _get_part_hp(region)
 
-	structure_hp = maxi(0, structure_hp - damage)
 	match region:
-		"TORSO":
+		"TORSO", "STRUCTURE":
 			torso_hp = maxi(0, torso_hp - damage)
-			if not _smoke_deployed and torso_hp <= max_torso_hp * 0.5:
-				_smoke_deployed = true
-				_deploy_smoke_screen()
 		"LEFT LEG":
 			left_leg_hp = maxi(0, left_leg_hp - damage)
 		"RIGHT LEG":
 			right_leg_hp = maxi(0, right_leg_hp - damage)
 
-	var part_broken := before_part_hp > 0 and _get_part_hp(region) <= 0 and region != "STRUCTURE"
+	var part_broken := before_part_hp > 0 and _get_part_hp(region) <= 0
+
 	if part_broken:
 		_broken_parts[region] = true
 
-	if structure_hp <= 0 or torso_hp <= 0:
+	# Destruction Logic: Torso destroyed OR BOTH legs destroyed
+	var legs_destroyed := (left_leg_hp <= 0 and right_leg_hp <= 0)
+	if torso_hp <= 0 or legs_destroyed:
 		_destroy_zezlan()
 
-	damage_number_script.display_text(hit_pos + Vector3.UP * 0.5, "-%d" % damage, get_tree().current_scene, Color(1.0, 0.78, 0.12))
+	var damage_text := "-%d" % damage
+	if is_crit:
+		damage_text = "CRIT! " + damage_text
+	
+	damage_number_script.display_text(hit_pos + Vector3.UP * 0.5, damage_text, get_tree().current_scene, Color(1.0, 0.78, 0.12) if not is_crit else Color(1.0, 0.2, 0.1))
 	if part_broken:
 		damage_number_script.display_text(hit_pos + Vector3.UP * 1.2, "BROKEN", get_tree().current_scene, Color(1.0, 0.25, 0.1))
 
@@ -184,7 +189,7 @@ func apply_shell_damage(hit_body: Node, hit_pos: Vector3) -> Dictionary:
 	return {
 		"applied": true,
 		"damage": damage,
-		"region": region,
+		"region": "WEAK SPOT" if is_crit else region,
 		"part_key": part_key,
 		"part_broken": part_broken,
 		"destroyed": is_destroyed,
@@ -201,7 +206,6 @@ func get_fire_progress() -> float:
 func get_hp_snapshot() -> Dictionary:
 	return {
 		"name": "ZEZLAN",
-		"structure": {"current": structure_hp, "max": max_structure_hp},
 		"parts": {
 			"torso": {"label": "TORSO", "current": torso_hp, "max": max_torso_hp, "broken": torso_hp <= 0},
 			"left_leg": {"label": "LEFT LEG", "current": left_leg_hp, "max": max_left_leg_hp, "broken": left_leg_hp <= 0},
@@ -211,7 +215,7 @@ func get_hp_snapshot() -> Dictionary:
 		"destroyed": is_destroyed
 	}
 
-func apply_rpg_structure_damage(damage: int, hit_pos: Vector3) -> Dictionary:
+func apply_rpg_structure_damage(damage: int, hit_pos: Vector3, hit_body: Node = null) -> Dictionary:
 	if is_destroyed:
 		return {
 			"applied": false,
@@ -222,28 +226,66 @@ func apply_rpg_structure_damage(damage: int, hit_pos: Vector3) -> Dictionary:
 			"snapshot": get_hp_snapshot()
 		}
 
+	var region := "TORSO"
+	var part_key := "torso"
+	var is_crit := false
+	if hit_body:
+		region = _get_hit_region(hit_body)
+		part_key = _region_to_part_key(region)
+		if region == "WEAK SPOT":
+			is_crit = true
+			region = "TORSO"
+			part_key = "torso"
+
 	var applied_damage: int = maxi(0, damage)
-	structure_hp = maxi(0, structure_hp - applied_damage)
-	if structure_hp <= 0:
+	if is_crit:
+		applied_damage *= 2
+
+	var before_hp := _get_part_hp(region)
+	_apply_damage_to_part(region, applied_damage)
+	var part_broken := before_hp > 0 and _get_part_hp(region) <= 0
+
+	# Destruction Logic: Torso destroyed OR BOTH legs destroyed
+	var legs_destroyed := (left_leg_hp <= 0 and right_leg_hp <= 0)
+	if torso_hp <= 0 or legs_destroyed:
 		_destroy_zezlan()
 
-	damage_number_script.display_text(hit_pos + Vector3.UP * 0.75, "-%d RPG" % applied_damage, get_tree().current_scene, Color(1.0, 0.58, 0.16), 28)
+	var damage_text := "-%d RPG" % applied_damage
+	if is_crit:
+		damage_text = "CRIT! " + damage_text
+
+	# Display RPG-specific damage number (slightly larger than before, distinct orange color)
+	damage_number_script.display_text(hit_pos + Vector3.UP * 0.75, damage_text, get_tree().current_scene, Color(1.0, 0.58, 0.16), 32)
+	if part_broken:
+		damage_number_script.display_text(hit_pos + Vector3.UP * 1.4, "%s BROKEN" % region, get_tree().current_scene, Color(1.0, 0.25, 0.1), 24)
 
 	var snapshot := get_hp_snapshot()
 	hp_changed.emit(snapshot)
 	return {
 		"applied": true,
 		"damage": applied_damage,
-		"region": "STRUCTURE",
-		"part_key": "structure",
+		"region": "WEAK SPOT" if is_crit else region,
+		"part_key": part_key,
+		"part_broken": part_broken,
 		"destroyed": is_destroyed,
 		"snapshot": snapshot
 	}
+
+func _apply_damage_to_part(region: String, damage: int) -> void:
+	match region:
+		"TORSO", "STRUCTURE":
+			torso_hp = maxi(0, torso_hp - damage)
+		"LEFT LEG":
+			left_leg_hp = maxi(0, left_leg_hp - damage)
+		"RIGHT LEG":
+			right_leg_hp = maxi(0, right_leg_hp - damage)
 
 func _get_hit_region(hit_body: Node) -> String:
 	var node := hit_body
 	while node:
 		var node_name := node.name.to_lower()
+		if "weak" in node_name or "box" in node_name:
+			return "WEAK SPOT"
 		if "torso" in node_name:
 			return "TORSO"
 		if "footl" in node_name or "kneel" in node_name or "legl" in node_name:
@@ -284,7 +326,7 @@ func _get_part_hp(region: String) -> int:
 		"RIGHT LEG":
 			return right_leg_hp
 		_:
-			return structure_hp
+			return torso_hp
 
 func _destroy_zezlan() -> void:
 	if is_destroyed:
@@ -534,12 +576,3 @@ func _get_mesh_world_aabb(mesh_instance: MeshInstance3D) -> AABB:
 
 func _fmt_vec(value: Vector3) -> String:
 	return "(%.2f, %.2f, %.2f)" % [value.x, value.y, value.z]
-
-func _deploy_smoke_screen() -> void:
-	var smoke = get_tree().current_scene.find_child("SmokeScreen", true, false)
-	if smoke and smoke.has_method("deploy"):
-		smoke.deploy()
-	
-	var bark_ui = get_tree().current_scene.find_child("CombatBarkUI", true, false)
-	if bark_ui and bark_ui.has_method("show_smoke_alert"):
-		bark_ui.show_smoke_alert()

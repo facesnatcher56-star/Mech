@@ -57,8 +57,6 @@ var hit_sound: AudioStreamPlayer3D = null
 @export var max_fov_limit: float = 82.0
 @export var zoom_sensitivity: float = 5.0
 @export_group("Player HP")
-## Total player structure pool. Reaching zero kills the mech.
-@export var max_structure_hp: int = 60
 ## Torso armor. Reaching zero also kills the mech.
 @export var max_torso_hp: int = 40
 ## Left arm armor pool.
@@ -444,7 +442,6 @@ func _setup_player_damage_model() -> void:
 	player_damage_model.name = "PlayerDamageModel"
 	add_child(player_damage_model)
 	player_damage_model.configure({
-		"max_structure_hp": max_structure_hp,
 		"max_torso_hp": max_torso_hp,
 		"max_left_arm_hp": max_left_arm_hp,
 		"max_right_arm_hp": max_right_arm_hp,
@@ -936,12 +933,12 @@ func _start_weapon_reload() -> void:
 		reload_timer = 0.0
 		current_spread = max_spread
 
-func hit(body: Node = null):
+func part_hit(body: Node = null):
 	_hit_during_enemy_cinematic = true
 	_refresh_player_hit_response_controller()
 	if player_hit_response_controller:
 		var hit_region := _classify_player_hit(body)
-		is_dead = player_hit_response_controller.apply_hit(camera, is_dead)
+		is_dead = player_hit_response_controller.apply_hit(camera, is_dead, hit_region)
 		if not is_dead:
 			_apply_aim_disruption_on_hit(hit_region)
 
@@ -949,6 +946,8 @@ func _classify_player_hit(body: Node) -> String:
 	if not body:
 		return "BODY"
 	var node_name := body.name.to_lower()
+	if "weak" in node_name or "box" in node_name:
+		return "WEAK SPOT"
 	if "arm" in node_name or "shoulder" in node_name or "gun" in node_name:
 		return "ARM"
 	return "BODY"

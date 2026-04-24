@@ -52,9 +52,9 @@ func show_target_no_damage() -> void:
 	if target_dossier_ui:
 		target_dossier_ui.show_impact_line("NO DAMAGE", "", get_current_target_hp_snapshot())
 
-func show_player_hit(part_key: String, snapshot: Dictionary) -> void:
+func show_player_hit(part_key: String, snapshot: Dictionary, line: String = "HIT!") -> void:
 	if self_dossier_ui:
-		self_dossier_ui.show_impact_line("HIT!", part_key, snapshot)
+		self_dossier_ui.show_impact_line(line, part_key, snapshot)
 
 func apply_enemy_damage(body: Node, hit_pos: Vector3) -> Dictionary:
 	var damage_model := find_damage_model_node(body)
@@ -64,13 +64,13 @@ func apply_enemy_damage(body: Node, hit_pos: Vector3) -> Dictionary:
 	var result: Dictionary = damage_model.apply_shell_damage(body, hit_pos)
 	if target_dossier_ui and result.has("snapshot"):
 		var damage := int(result.get("damage", 0))
-		var region := str(result.get("region", "STRUCTURE"))
+		var region := str(result.get("region", "TORSO"))
 		var line := "HIT %s  -%d" % [region, damage]
 		if bool(result.get("part_broken", false)):
 			line = "%s BROKEN" % region
 		if bool(result.get("destroyed", false)):
 			line = "TARGET DESTROYED"
-		target_dossier_ui.show_impact_line(line, str(result.get("part_key", "")), result["snapshot"])
+		target_dossier_ui.show_impact_line(line, str(result.get("part_key", "torso")), result["snapshot"])
 	return result
 
 func get_current_target_hp_snapshot() -> Dictionary:

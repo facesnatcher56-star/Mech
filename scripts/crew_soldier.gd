@@ -263,7 +263,7 @@ func _on_rpg_shell_hit(body, hit_pos: Vector3, rocket_state: Dictionary, target_
 	var hit_target := instance_from_id(target_id) as Node3D
 	if will_hit and hit_target and _is_body_on_target(body, hit_target):
 		_rpg_play_hit_sound(hit_pos)
-		_apply_rpg_damage(hit_target, hit_pos)
+		_apply_rpg_damage(hit_target, hit_pos, body)
 	else:
 		_show_crew_line("Missed. Reloading.")
 		if hit_target:
@@ -276,13 +276,19 @@ func _rpg_play_hit_sound(hit_pos: Vector3) -> void:
 		_snd_hit.global_position = hit_pos
 		_snd_hit.play()
 
-func _apply_rpg_damage(target: Node3D, hit_pos: Vector3) -> void:
+func _apply_rpg_damage(target: Node3D, hit_pos: Vector3, body: Node = null) -> void:
 	var damage_model := _find_rpg_damage_model(target)
 	if damage_model and damage_model.has_method("apply_rpg_structure_damage"):
-		var result: Dictionary = damage_model.apply_rpg_structure_damage(rpg_structure_damage, hit_pos)
+		var result: Dictionary = damage_model.apply_rpg_structure_damage(rpg_structure_damage, hit_pos, body)
 		_show_crew_line("Hit confirmed.")
 		if result.has("snapshot"):
-			_update_visible_dossier("RPG HIT  -%d" % int(result.get("damage", 0)), target, result["snapshot"])
+			var damage := int(result.get("damage", 0))
+			var region := str(result.get("region", "STRUCTURE"))
+			var part_key := str(result.get("part_key", "structure"))
+			var line := "RPG HIT %s  -%d" % [region, damage]
+			if bool(result.get("part_broken", false)):
+				line = "RPG: %s BROKEN" % region
+			_update_visible_dossier(line, target, result["snapshot"], part_key)
 	else:
 		_show_crew_line("Hit confirmed.")
 
@@ -334,7 +340,7 @@ func _is_body_on_target(body: Object, target: Node) -> bool:
 func _get_friendly_root() -> Node3D:
 	return self
 
-func _update_visible_dossier(line: String, target: Node3D, snapshot: Dictionary = {}) -> void:
+func _update_visible_dossier(line: String, target: Node3D, snapshot: Dictionary = {}, part_key: String = "structure") -> void:
 	var current_scene := get_tree().current_scene
 	if not current_scene:
 		return
@@ -344,11 +350,11 @@ func _update_visible_dossier(line: String, target: Node3D, snapshot: Dictionary 
 			snapshot = damage_model.get_hp_snapshot()
 	var dossier = current_scene.find_child("TargetDossierUI", true, false)
 	if dossier and dossier.visible and dossier.has_method("show_impact_line"):
-		dossier.show_impact_line(line, "structure", snapshot)
+		dossier.show_impact_line(line, part_key, snapshot)
 		return
 	var reload_ui = current_scene.find_child("EnemyReloadUI", true, false)
 	if reload_ui and reload_ui.visible and reload_ui.has_method("show_impact_line"):
-		reload_ui.show_impact_line(line, "structure", snapshot)
+		reload_ui.show_impact_line(line, part_key, snapshot)
 
 func _find_crew_order_ui() -> void:
 	var current_scene := get_tree().current_scene

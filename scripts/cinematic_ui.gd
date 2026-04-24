@@ -88,10 +88,15 @@ func _ready():
 func _find_cockpit() -> Node:
 	var node = get_parent()
 	while node:
-		if node.has_method("_begin_aim_flow") and node.has_method("_get_aim_stage_fov"):
+		if not (node is StaticBody3D) and node.has_method("_begin_aim_flow") and node.has_method("_get_aim_stage_fov"):
 			return node
 		node = node.get_parent()
-	return get_tree().get_first_node_in_group("player")
+	
+	# Fallback: Find the player cockpit in the scene
+	for player_node in get_tree().get_nodes_in_group("player"):
+		if player_node.has_method("_begin_aim_flow"):
+			return player_node
+	return null
 
 func _apply_aim_tuning_to_cockpit() -> void:
 	cockpit.stage_1_stroke_speed_multiplier = stage_1_stroke_speed

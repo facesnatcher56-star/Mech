@@ -4,8 +4,8 @@
 [ext_resource type="PackedScene" uid="uid://c1m3bpvfqqam5" path="res://assets/prefabs/testshell.glb" id="2_testshell"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
-radius = 0.1
-height = 0.8418945
+radius = 0.0073242188
+height = 0.75737303
 
 [node name="TracerShell" type="Area3D" unique_id=1773837405]
 script = ExtResource("1_script")
@@ -14,7 +14,7 @@ script = ExtResource("1_script")
 transform = Transform3D(0.4, 0, 0, 0, -1.7484556e-08, 0.4, 0, -0.4, -1.7484556e-08, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1776268000]
-transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 9.156335e-10, 0.0063764006)
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, -9.316419e-10, -0.009975225)
 shape = SubResource("CapsuleShape3D_1")
 
 [node name="LifeTimer" type="Timer" parent="." unique_id=1217509717]
