@@ -20,29 +20,36 @@ const AMMO_PROFILES: Dictionary = {
 }
 const DAMAGE_NUMBER = preload("res://scripts/damage_number.gd")
 
-const AIM_CRIT_START := 0.20
-const AIM_CRIT_BASE  := 0.05
-const AIM_CRIT_DECAY := 3.0
+const AIM_CRIT_START     := 0.20
+const AIM_CRIT_BASE      := 0.05
+const AIM_CRIT_HOLD      := 3.0   # seconds at full bonus before decay begins
+const AIM_CRIT_DECAY_PPS := 0.01  # percent-points per second during decay
 
 var _current_ammo: String = "STANDARD"
 var _aim_crit_bonus: float = 0.0
 var _aim_crit_active: bool = false
+var _aim_crit_hold_timer: float = 0.0
 
 signal aim_crit_changed(crit_total: float)
 
 func begin_aim_crit_window() -> void:
 	_aim_crit_bonus = AIM_CRIT_START - AIM_CRIT_BASE
+	_aim_crit_hold_timer = 0.0
 	_aim_crit_active = true
 	aim_crit_changed.emit(AIM_CRIT_START)
 
 func reset_aim_crit() -> void:
 	_aim_crit_bonus = 0.0
+	_aim_crit_hold_timer = 0.0
 	_aim_crit_active = false
 
 func _process(delta: float) -> void:
 	if not _aim_crit_active:
 		return
-	_aim_crit_bonus = maxf(0.0, _aim_crit_bonus - (AIM_CRIT_START - AIM_CRIT_BASE) / AIM_CRIT_DECAY * delta)
+	_aim_crit_hold_timer += delta
+	if _aim_crit_hold_timer < AIM_CRIT_HOLD:
+		return
+	_aim_crit_bonus = maxf(0.0, _aim_crit_bonus - AIM_CRIT_DECAY_PPS * delta)
 	aim_crit_changed.emit(AIM_CRIT_BASE + _aim_crit_bonus)
 	if _aim_crit_bonus == 0.0:
 		_aim_crit_active = false
