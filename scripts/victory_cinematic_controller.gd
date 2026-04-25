@@ -28,6 +28,7 @@ var _fire_spawned: bool = false
 var _fade_triggered: bool = false
 var _fade_rect: ColorRect = null
 var _waiting_for_click: bool = false
+var _prompt_label: Label = null
 
 func configure(p_camera: Camera3D, p_canvas_layer: Node, p_bark_ui: Node) -> void:
 	camera       = p_camera
@@ -52,9 +53,9 @@ func begin(p_zezlan: Node3D) -> void:
 	if canvas_layer:
 		canvas_layer.visible = false
 
-	# Victory image — layer 127, hidden behind black until reveal
+	# Victory image layer — Layer 128 (TOP)
 	var image_layer := CanvasLayer.new()
-	image_layer.layer = 127
+	image_layer.layer = 128
 	add_child(image_layer)
 
 	var image_rect := TextureRect.new()
@@ -65,9 +66,19 @@ func begin(p_zezlan: Node3D) -> void:
 	image_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	image_layer.add_child(image_rect)
 
-	# Black overlay — layer 128
+	# Click prompt — also in Layer 128
+	_prompt_label = Label.new()
+	_prompt_label.text = "CLICK TO CONTINUE"
+	_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_prompt_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_prompt_label.position.y -= 100
+	_prompt_label.modulate.a = 0.0
+	_prompt_label.add_theme_font_size_override("font_size", 32)
+	image_layer.add_child(_prompt_label)
+
+	# Black overlay layer — Layer 127 (BOTTOM)
 	var fade_layer := CanvasLayer.new()
-	fade_layer.layer = 128
+	fade_layer.layer = 127
 	add_child(fade_layer)
 
 	_fade_rect = ColorRect.new()
@@ -82,8 +93,6 @@ func _process(delta: float) -> void:
 	if not _orbiting or not is_instance_valid(zezlan_node):
 		if _waiting_for_click:
 			_elapsed += delta
-			if Engine.get_frames_drawn() % 60 == 0:
-				print("[DEBUG] Victory: Waiting for click. Time since start: %.2fs" % _elapsed)
 		return
 
 	_elapsed += delta
@@ -120,23 +129,25 @@ func _run_fade_sequence() -> void:
 	# Fade to black while camera keeps orbiting
 	tween.tween_property(_fade_rect, "color:a", 1.0, FADE_DURATION)
 	tween.tween_interval(BLACK_HOLD)
-	# Reveal victory image and lift black simultaneously
+	# Reveal victory image over the black background
 	if image_rect:
 		tween.tween_property(image_rect, "modulate:a", 1.0, REVEAL_DURATION)
-	tween.parallel().tween_property(_fade_rect, "color:a", 0.0, REVEAL_DURATION)
 	# Stop orbiting once the image is fully revealed
 	tween.tween_callback(func(): 
 		_orbiting = false
 		_waiting_for_click = true
+		_show_prompt()
 	)
 
-func _input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		print("[DEBUG] Victory: Input detected. waiting_for_click=%s button=%d" % [_waiting_for_click, event.button_index])
+func _show_prompt() -> void:
+	if _prompt_label:
+		var ptween := create_tween().set_loops()
+		ptween.tween_property(_prompt_label, "modulate:a", 1.0, 0.8)
+		ptween.tween_property(_prompt_label, "modulate:a", 0.3, 0.8)
 
+func _input(event: InputEvent) -> void:
 	if _waiting_for_click and event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			print("[DEBUG] Victory: Left click received, advancing to post-battle screen.")
 			_waiting_for_click = false
 			cinematic_completed.emit()
 

@@ -206,7 +206,6 @@ var player_hit_response_controller: Node = null
 var target_query_helper: Node = null
 var combat_view_flow_controller: Node = null
 var victory_cinematic_controller: Node = null
-var post_battle_screen_ui: Control = null
 var ammo_wheel_ui: Control = null
 
 func _ready():
@@ -467,16 +466,18 @@ func _setup_victory_cinematic_controller() -> void:
 	victory_cinematic_controller.name = "VictoryCinematicController"
 	add_child(victory_cinematic_controller)
 	victory_cinematic_controller.configure(camera, canvas_layer, combat_bark_ui)
-	
-	if canvas_layer:
-		post_battle_screen_ui = POST_BATTLE_SCREEN_UI.new()
-		post_battle_screen_ui.name = "PostBattleScreenUI"
-		canvas_layer.add_child(post_battle_screen_ui)
-		victory_cinematic_controller.cinematic_completed.connect(func():
-			if post_battle_screen_ui:
-				post_battle_screen_ui.open()
-		)
-	
+
+	victory_cinematic_controller.cinematic_completed.connect(func():
+		var next_scene = POST_BATTLE_SCREEN_UI.new()
+		next_scene.name = "PostBattleScreen"
+		var tree = get_tree()
+		var root = tree.root
+		var current = tree.current_scene
+		root.add_child(next_scene)
+		tree.current_scene = next_scene
+		current.queue_free()
+	)
+
 	# Connect to every node in the enemy group that has the zezlan_destroyed signal
 	for node in get_tree().get_nodes_in_group("enemy"):
 		if node.has_signal("zezlan_destroyed"):
