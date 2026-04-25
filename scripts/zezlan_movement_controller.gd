@@ -81,7 +81,7 @@ const _CANNON_FIRE_STREAM = preload("res://assets/Sounds/artillery-gunfire2.wav"
 
 @export_group("Zezlan Collision Debug")
 ## Prints Zezlan collision setup details, including generated mesh collider names, layers, masks, and AABBs.
-@export var collision_debug_enabled: bool = true
+@export var collision_debug_enabled: bool = false
 ## Prints one line for each generated mesh collider. Disable if the startup log gets too noisy.
 @export var collision_debug_log_each_collider: bool = true
 

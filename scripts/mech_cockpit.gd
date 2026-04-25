@@ -19,6 +19,7 @@ const TARGET_QUERY_HELPER = preload("res://scripts/target_query_helper.gd")
 const COMBAT_VIEW_FLOW_CONTROLLER = preload("res://scripts/combat_view_flow_controller.gd")
 const VICTORY_CINEMATIC_CONTROLLER = preload("res://scripts/victory_cinematic_controller.gd")
 const AMMO_WHEEL_UI = preload("res://scripts/ammo_wheel_ui.gd")
+const POST_BATTLE_SCREEN_UI = preload("res://scripts/post_battle_screen_ui.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -205,6 +206,7 @@ var player_hit_response_controller: Node = null
 var target_query_helper: Node = null
 var combat_view_flow_controller: Node = null
 var victory_cinematic_controller: Node = null
+var post_battle_screen_ui: Control = null
 var ammo_wheel_ui: Control = null
 
 func _ready():
@@ -465,6 +467,16 @@ func _setup_victory_cinematic_controller() -> void:
 	victory_cinematic_controller.name = "VictoryCinematicController"
 	add_child(victory_cinematic_controller)
 	victory_cinematic_controller.configure(camera, canvas_layer, combat_bark_ui)
+	
+	if canvas_layer:
+		post_battle_screen_ui = POST_BATTLE_SCREEN_UI.new()
+		post_battle_screen_ui.name = "PostBattleScreenUI"
+		canvas_layer.add_child(post_battle_screen_ui)
+		victory_cinematic_controller.cinematic_completed.connect(func():
+			if post_battle_screen_ui:
+				post_battle_screen_ui.open()
+		)
+	
 	# Connect to every node in the enemy group that has the zezlan_destroyed signal
 	for node in get_tree().get_nodes_in_group("enemy"):
 		if node.has_signal("zezlan_destroyed"):
@@ -473,6 +485,7 @@ func _setup_victory_cinematic_controller() -> void:
 func _on_zezlan_destroyed() -> void:
 	is_dead = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_stop_analog_heartbeat()
 	var zezlan := get_tree().get_first_node_in_group("enemy") as Node3D
 	if victory_cinematic_controller and is_instance_valid(zezlan):
 		victory_cinematic_controller.begin(zezlan)
@@ -859,6 +872,8 @@ func _is_enemy_fire_cinematic_active() -> bool:
 	return false
 
 func _begin_aim_flow() -> void:
+	if _is_enemy_fire_cinematic_active():
+		return
 	if not is_instance_valid(camera):
 		_try_bind_main_camera()
 	if combat_view_flow_controller:

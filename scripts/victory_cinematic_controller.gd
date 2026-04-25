@@ -1,5 +1,7 @@
 extends Node
 
+signal cinematic_completed
+
 const VICTORY_IMAGE   := preload("res://assets/VFX/zezlandefeat.png")
 const SMOKE_TEX       := preload("res://assets/VFX/Smoke/PNG/Black smoke/blackSmoke00.png")
 
@@ -25,6 +27,7 @@ var _bark_played: bool  = false
 var _fire_spawned: bool = false
 var _fade_triggered: bool = false
 var _fade_rect: ColorRect = null
+var _waiting_for_click: bool = false
 
 func configure(p_camera: Camera3D, p_canvas_layer: Node, p_bark_ui: Node) -> void:
 	camera       = p_camera
@@ -41,6 +44,7 @@ func begin(p_zezlan: Node3D) -> void:
 	_bark_played   = false
 	_fire_spawned  = false
 	_fade_triggered = false
+	_waiting_for_click = false
 
 	var diff := camera.global_position - zezlan_node.global_position
 	_orbit_angle = atan2(diff.x, diff.z)
@@ -51,7 +55,7 @@ func begin(p_zezlan: Node3D) -> void:
 	# Victory image — layer 127, hidden behind black until reveal
 	var image_layer := CanvasLayer.new()
 	image_layer.layer = 127
-	get_tree().root.add_child(image_layer)
+	add_child(image_layer)
 
 	var image_rect := TextureRect.new()
 	image_rect.texture = VICTORY_IMAGE
@@ -64,7 +68,7 @@ func begin(p_zezlan: Node3D) -> void:
 	# Black overlay — layer 128
 	var fade_layer := CanvasLayer.new()
 	fade_layer.layer = 128
-	get_tree().root.add_child(fade_layer)
+	add_child(fade_layer)
 
 	_fade_rect = ColorRect.new()
 	_fade_rect.color = Color(0.0, 0.0, 0.0, 0.0)
@@ -76,6 +80,10 @@ func begin(p_zezlan: Node3D) -> void:
 
 func _process(delta: float) -> void:
 	if not _orbiting or not is_instance_valid(zezlan_node):
+		if _waiting_for_click:
+			_elapsed += delta
+			if Engine.get_frames_drawn() % 60 == 0:
+				print("[DEBUG] Victory: Waiting for click. Time since start: %.2fs" % _elapsed)
 		return
 
 	_elapsed += delta
@@ -117,7 +125,20 @@ func _run_fade_sequence() -> void:
 		tween.tween_property(image_rect, "modulate:a", 1.0, REVEAL_DURATION)
 	tween.parallel().tween_property(_fade_rect, "color:a", 0.0, REVEAL_DURATION)
 	# Stop orbiting once the image is fully revealed
-	tween.tween_callback(func(): _orbiting = false)
+	tween.tween_callback(func(): 
+		_orbiting = false
+		_waiting_for_click = true
+	)
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		print("[DEBUG] Victory: Input detected. waiting_for_click=%s button=%d" % [_waiting_for_click, event.button_index])
+
+	if _waiting_for_click and event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			print("[DEBUG] Victory: Left click received, advancing to post-battle screen.")
+			_waiting_for_click = false
+			cinematic_completed.emit()
 
 func _spawn_fire() -> void:
 	# Fire material — smoke sprite with additive blend tinted orange
@@ -146,7 +167,7 @@ func _spawn_fire() -> void:
 
 	for cfg in emitter_configs:
 		var emitter := CPUParticles3D.new()
-		get_tree().root.add_child(emitter)
+		add_child(emitter)
 		emitter.global_position = zezlan_node.global_position + cfg[0]
 
 		emitter.emitting              = true

@@ -87,7 +87,6 @@ func _spawn_shell() -> void:
 		player.set_enemy_active_shell(shell, aim_pos)
 
 func part_destroyed(part: Node3D) -> void:
-	print("Enemy part destroyed: " + part.part_name)
 	if part.is_vital:
 		destroy_completely()
 
@@ -124,7 +123,6 @@ func destroy_completely() -> void:
 	if is_destroyed:
 		return
 	is_destroyed = true
-	print("ENEMY DESTROYED!")
 
 	var explosion_scene = preload("res://scenes/explosion.tscn")
 	var explosion = explosion_scene.instantiate()

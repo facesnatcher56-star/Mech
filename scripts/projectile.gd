@@ -72,7 +72,7 @@ func _on_body_entered(body):
 		return
 
 	if not is_player_shot:
-		print("[ZEZLAN SHELL] hit body='%s' groups=%s pos=%s" % [body.name, str(body.get_groups()), _fmt_vec(global_position)])
+		pass
 	elif collision_debug_enabled:
 		print("[SHELL TRACE] AREA HIT body=", _describe_body(body), " pos=", _fmt_vec(global_position), " prev=", _fmt_vec(_last_position))
 	var hit_pos = global_position

@@ -113,6 +113,8 @@ func begin_aim_flow(is_reloading: bool, normal_view_state: int, gun_cam_state: i
 	)
 
 func enter_analog_aim_view(analog_aim_state: int, last_ray_result: Dictionary = {}) -> void:
+	if _is_enemy_fire_cinematic_active():
+		return
 	combat_view_state = analog_aim_state
 	if _player_camera:
 		_player_camera.current = false
@@ -131,6 +133,8 @@ func enter_analog_aim_view(analog_aim_state: int, last_ray_result: Dictionary = 
 	targeting_stroke_reset_requested.emit()
 
 func resume_analog_aim_view(analog_aim_state: int, last_ray_result: Dictionary = {}) -> void:
+	if _is_enemy_fire_cinematic_active():
+		return
 	combat_view_state = analog_aim_state
 	if _player_camera:
 		_player_camera.current = false
@@ -175,6 +179,7 @@ func begin_fire_sequence_from_lock(shot_lock: Dictionary, firing_state: int) -> 
 	fire_sequence_requested.emit(shot_lock)
 
 func reset_to_normal(normal_view_state: int) -> void:
+	_kill_transition()
 	combat_view_state = normal_view_state
 	is_transitioning = false
 	analog_hud_visibility_changed.emit(false)

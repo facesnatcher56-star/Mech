@@ -11,7 +11,6 @@ var damage_number_script = preload("res://scripts/damage_number.gd")
 func hit(_body: Node = null):
 	if is_destroyed: return
 	
-	print(part_name + " HIT!")
 	damage_number_script.display_text(global_position + Vector3(0, 0.5, 0), "1", get_tree().root)
 	destroy_part()
 
