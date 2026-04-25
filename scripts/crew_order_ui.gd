@@ -21,9 +21,9 @@ extends Control
 @export var fade_time: float = 0.18
 
 @export_group("Layout Adjustments")
-@export_range(0.1, 2.0, 0.01) var display_scale: float = 0.40
-@export_range(-1000, 1000, 1) var custom_offset_x: float = -22.0
-@export_range(-1000, 1000, 1) var custom_offset_y: float = -24.0
+@export_range(0.1, 2.0, 0.01) var display_scale: float = 0.80
+@export_range(-1000, 1000, 1) var custom_offset_x: float = -21.0
+@export_range(-1000, 1000, 1) var custom_offset_y: float = -21.0
 
 var _hide_timer: SceneTreeTimer = null
 var _fade_tween: Tween = null
@@ -52,8 +52,8 @@ func _update_layout() -> void:
 	pivot_offset = Vector2.ZERO
 	
 	# Current player dossier setup is top-left (margin 22) with height 306
-	# We use 0.65 as the default 'standard' scale to calculate the base bottom
-	var base_dossier_scale := 0.65
+	# Must match display_scale set in combat_dossier_presenter._setup_self_dossier_ui()
+	var base_dossier_scale := 0.80
 	var dossier_bottom := 22.0 + 306.0 * base_dossier_scale
 	
 	var base_x := 22.0

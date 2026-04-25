@@ -56,12 +56,12 @@ func show_player_hit(part_key: String, snapshot: Dictionary, line: String = "HIT
 	if self_dossier_ui:
 		self_dossier_ui.show_impact_line(line, part_key, snapshot)
 
-func apply_enemy_damage(body: Node, hit_pos: Vector3) -> Dictionary:
+func apply_enemy_damage(body: Node, hit_pos: Vector3, profile: Dictionary = {}) -> Dictionary:
 	var damage_model := find_damage_model_node(body)
 	if not damage_model or not damage_model.has_method("apply_shell_damage"):
 		return {}
 
-	var result: Dictionary = damage_model.apply_shell_damage(body, hit_pos)
+	var result: Dictionary = damage_model.apply_shell_damage(body, hit_pos, profile)
 	if target_dossier_ui and result.has("snapshot"):
 		var damage := int(result.get("damage", 0))
 		var region := str(result.get("region", "TORSO"))
@@ -102,7 +102,7 @@ func _setup_self_dossier_ui() -> void:
 	self_dossier_ui = TARGET_DOSSIER_UI.new()
 	self_dossier_ui.name = "SelfDossierUI"
 	self_dossier_ui.anchor_corner = TARGET_DOSSIER_UI.AnchorCorner.TOP_LEFT
-	self_dossier_ui.display_scale = 0.40
+	self_dossier_ui.display_scale = 0.80
 	self_dossier_ui.custom_offset_x = -21.0
 	self_dossier_ui.custom_offset_y = -21.0
 	canvas_layer.add_child(self_dossier_ui)

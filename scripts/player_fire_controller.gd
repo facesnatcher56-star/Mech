@@ -1,7 +1,30 @@
 extends Node
 
-const PROJECTILE = preload("res://scenes/projectile.tscn")
+const AMMO_SCENES: Dictionary = {
+	"STANDARD":   preload("res://scenes/projectile.tscn"),
+	"AP":         preload("res://scenes/projectile.tscn"),
+	"HE":         preload("res://scenes/projectile.tscn"),
+	"INCENDIARY": preload("res://scenes/projectile.tscn"),
+	"SHRAPNEL":     preload("res://scenes/projectile.tscn"),
+	"CONCUSSION":   preload("res://scenes/projectile.tscn"),
+	"BREACH":       preload("res://scenes/projectile.tscn"),
+}
+const AMMO_PROFILES: Dictionary = {
+	"STANDARD":   {"torso": 18, "leg": 14, "fallback": 18, "variance": 0.20, "crit_chance": 0.05, "crit_multiplier": 2.0},
+	"AP":         {"torso": 24, "leg": 12, "fallback":  8, "variance": 0.15, "crit_chance": 0.02, "crit_multiplier": 1.75},
+	"HE":         {"torso": 14, "leg": 16, "fallback": 12, "variance": 0.25, "crit_chance": 0.04, "crit_multiplier": 1.5,  "splash": 6},
+	"INCENDIARY": {"torso": 10, "leg":  9, "fallback":  7, "variance": 0.10, "crit_chance": 0.03, "crit_multiplier": 1.5,  "burn_damage": 3, "burn_ticks": 3, "burn_interval": 4.0},
+	"SHRAPNEL":   {"torso": 12, "leg": 13, "fallback": 10, "variance": 0.30, "crit_chance": 0.06, "crit_multiplier": 1.5,  "fragments": 2, "fragment_damage": 4},
+	"CONCUSSION": {"torso": 13, "leg": 11, "fallback":  9, "variance": 0.15, "crit_chance": 0.03, "crit_multiplier": 1.5,  "stagger_min": 1.5, "stagger_max": 2.5, "stagger_reset_if_aiming": true},
+	"BREACH":     {"torso": 16, "leg": 10, "fallback":  6, "variance": 0.20, "crit_chance": 0.04, "crit_multiplier": 1.75, "armor_crack": 0.25},
+}
 const DAMAGE_NUMBER = preload("res://scripts/damage_number.gd")
+
+var _current_ammo: String = "STANDARD"
+
+func set_ammo_type(type_key: String) -> void:
+	if AMMO_SCENES.has(type_key):
+		_current_ammo = type_key
 
 var cockpit: Node3D = null
 var projectile_cinematic_controller: Node = null
@@ -93,12 +116,13 @@ func perform_actual_shot(target_point: Vector3, will_hit_enemy: bool, focal_poin
 	if not cockpit or not muzzle:
 		return
 
-	var shell = PROJECTILE.instantiate()
+	var shell = AMMO_SCENES[_current_ammo].instantiate()
 	shell.shooter = cockpit
 	shell.is_player_shot = true
 	shell.is_destined_for_hit = will_hit_enemy
 	shell.speed = projectile_speed
-	shell.has_hit.connect(_on_shell_hit)
+	var profile: Dictionary = AMMO_PROFILES.get(_current_ammo, AMMO_PROFILES["STANDARD"]).duplicate()
+	shell.has_hit.connect(_on_shell_hit.bind(profile))
 
 	cockpit.get_tree().root.add_child(shell)
 	shell.global_position = muzzle.global_position
@@ -109,7 +133,7 @@ func perform_actual_shot(target_point: Vector3, will_hit_enemy: bool, focal_poin
 
 	_apply_recoil()
 
-func _on_shell_hit(body: Node, hit_pos: Vector3) -> void:
+func _on_shell_hit(body: Node, hit_pos: Vector3, profile: Dictionary = {}) -> void:
 	if projectile_cinematic_controller and projectile_cinematic_controller.has_method("is_shot_resolved") and projectile_cinematic_controller.is_shot_resolved():
 		return
 
@@ -121,7 +145,7 @@ func _on_shell_hit(body: Node, hit_pos: Vector3) -> void:
 	var bark_part_name := ""
 	if is_enemy:
 		bark_part_name = body.name
-		damage_result = _apply_enemy_damage(body, hit_pos)
+		damage_result = _apply_enemy_damage(body, hit_pos, profile)
 		if not damage_result.is_empty() and str(damage_result.get("part_key", "")) != "":
 			bark_part_name = str(damage_result.get("part_key", ""))
 
@@ -180,9 +204,9 @@ func _get_enemy_aim_root(node: Node3D) -> Node3D:
 		return analog_targeting_controller.get_enemy_aim_root(node)
 	return node
 
-func _apply_enemy_damage(body: Node, hit_pos: Vector3) -> Dictionary:
+func _apply_enemy_damage(body: Node, hit_pos: Vector3, profile: Dictionary = {}) -> Dictionary:
 	if dossier_presenter and dossier_presenter.has_method("apply_enemy_damage"):
-		return dossier_presenter.apply_enemy_damage(body, hit_pos)
+		return dossier_presenter.apply_enemy_damage(body, hit_pos, profile)
 	return {}
 
 func _get_fire_camera() -> Camera3D:

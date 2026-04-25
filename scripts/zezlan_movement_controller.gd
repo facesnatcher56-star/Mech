@@ -100,6 +100,10 @@ const _CANNON_FIRE_STREAM = preload("res://assets/Sounds/artillery-gunfire2.wav"
 var _fire_timer: float = 0.0
 var _cycle_active: bool = false
 var _is_aiming: bool = false
+var _burn_parts: Dictionary = {}    # region -> {ticks_left, damage}
+var _burn_timer: float = 0.0
+var _burn_interval: float = 4.0
+var _cracked_parts: Dictionary = {} # region -> bonus_multiplier (e.g. 0.25 = +25%)
 var _aim_timer: float = 0.0
 var _aim_duration: float = 0.0
 var target_throttle: float = 0.0
@@ -139,7 +143,7 @@ func part_hit(body: Node = null, hit_pos: Vector3 = Vector3.ZERO) -> void:
 	var pos := hit_pos if hit_pos != Vector3.ZERO else global_position + Vector3.UP * 1.5
 	apply_shell_damage(body, pos)
 
-func apply_shell_damage(hit_body: Node, hit_pos: Vector3) -> Dictionary:
+func apply_shell_damage(hit_body: Node, hit_pos: Vector3, profile: Dictionary = {}) -> Dictionary:
 	if is_destroyed:
 		return {
 			"applied": false,
@@ -151,10 +155,19 @@ func apply_shell_damage(hit_body: Node, hit_pos: Vector3) -> Dictionary:
 
 	var region := _get_hit_region(hit_body, hit_pos)
 	var part_key := _region_to_part_key(region)
-	var damage := _get_damage_for_region(region)
-	var is_crit := randf() < 0.05
+	var damage := _get_damage_for_region(region, profile)
+	var crit_chance: float = profile.get("crit_chance", 0.05)
+	var crit_mult: float   = profile.get("crit_multiplier", 2.0)
+	var is_crit := randf() < crit_chance
 	if is_crit:
-		damage *= 2
+		damage = roundi(damage * crit_mult)
+
+	# Consume armor crack if this part was previously breached
+	var crack_bonus: float = _cracked_parts.get(region, 0.0)
+	var triggered_crack := crack_bonus > 0.0
+	if triggered_crack:
+		damage = roundi(damage * (1.0 + crack_bonus))
+		_cracked_parts.erase(region)
 
 	var before_part_hp := _get_part_hp(region)
 
@@ -179,10 +192,80 @@ func apply_shell_damage(hit_body: Node, hit_pos: Vector3) -> Dictionary:
 	var damage_text := "-%d" % damage
 	if is_crit:
 		damage_text = "CRIT! " + damage_text
-	
-	damage_number_script.display_text(hit_pos + Vector3.UP * 0.5, damage_text, get_tree().current_scene, Color(1.0, 0.78, 0.12) if not is_crit else Color(1.0, 0.2, 0.1))
+	damage_number_script.display_text(hit_pos, damage_text, get_tree().current_scene, Color(1.0, 0.78, 0.12) if not is_crit else Color(1.0, 0.2, 0.1))
+	if triggered_crack:
+		damage_number_script.display_text(hit_pos, "BREACH +%d%%" % roundi(crack_bonus * 100), get_tree().current_scene, Color(0.9, 0.5, 1.0), 22)
 	if part_broken:
-		damage_number_script.display_text(hit_pos + Vector3.UP * 1.2, "BROKEN", get_tree().current_scene, Color(1.0, 0.25, 0.1))
+		damage_number_script.display_text(hit_pos, "BROKEN", get_tree().current_scene, Color(1.0, 0.25, 0.1))
+
+	# Apply armor crack for next hit if this is a Breach shell
+	var armor_crack: float = profile.get("armor_crack", 0.0)
+	if armor_crack > 0.0 and not is_destroyed:
+		_cracked_parts[region] = armor_crack
+		damage_number_script.display_text(hit_pos, "CRACKED", get_tree().current_scene, Color(0.9, 0.5, 1.0), 20)
+
+	# Splash damage to one adjacent part
+	var splash_base: int = profile.get("splash", 0)
+	if splash_base > 0 and not is_destroyed:
+		var splash_region := _get_splash_target(region)
+		if splash_region != "":
+			var splash_dmg := maxi(1, roundi(splash_base * randf_range(0.8, 1.2)))
+			var splash_before := _get_part_hp(splash_region)
+			_apply_damage_to_part(splash_region, splash_dmg)
+			var splash_broken := splash_before > 0 and _get_part_hp(splash_region) <= 0
+			if splash_broken:
+				_broken_parts[splash_region] = true
+			var legs_destroyed2 := (left_leg_hp <= 0 and right_leg_hp <= 0)
+			if torso_hp <= 0 or legs_destroyed2:
+				_destroy_zezlan()
+			damage_number_script.display_text(hit_pos, "SPLASH -%d" % splash_dmg, get_tree().current_scene, Color(1.0, 0.5, 0.1), 22)
+			if splash_broken:
+				damage_number_script.display_text(hit_pos, "%s BROKEN" % splash_region, get_tree().current_scene, Color(1.0, 0.25, 0.1), 20)
+
+	# Fragment damage (Shrapnel) — hits N random parts other than the primary region
+	var frag_count: int   = profile.get("fragments", 0)
+	var frag_damage: int  = profile.get("fragment_damage", 0)
+	if frag_count > 0 and frag_damage > 0 and not is_destroyed:
+		var pool: Array = _get_fragment_pool(region)
+		pool.shuffle()
+		for i in mini(frag_count, pool.size()):
+			var frag_region: String = pool[i]
+			var fdmg := maxi(1, roundi(frag_damage * randf_range(0.8, 1.2)))
+			var fbefore := _get_part_hp(frag_region)
+			_apply_damage_to_part(frag_region, fdmg)
+			var fbroke := fbefore > 0 and _get_part_hp(frag_region) <= 0
+			if fbroke:
+				_broken_parts[frag_region] = true
+			damage_number_script.display_text(hit_pos, "FRAG -%d" % fdmg, get_tree().current_scene, Color(0.75, 0.75, 1.0), 21)
+			if fbroke:
+				damage_number_script.display_text(hit_pos, "%s BROKEN" % frag_region, get_tree().current_scene, Color(1.0, 0.25, 0.1), 20)
+		var legs_destroyed3 := (left_leg_hp <= 0 and right_leg_hp <= 0)
+		if torso_hp <= 0 or legs_destroyed3:
+			_destroy_zezlan()
+
+	# Burn application
+	var burn_damage: int = profile.get("burn_damage", 0)
+	var burn_ticks: int  = profile.get("burn_ticks", 0)
+	if burn_damage > 0 and burn_ticks > 0 and not is_destroyed:
+		_burn_interval = float(profile.get("burn_interval", 4.0))
+		if _burn_parts.has(region):
+			_burn_parts[region]["damage"] += burn_damage
+			_burn_parts[region]["ticks_left"] = burn_ticks
+		else:
+			_burn_parts[region] = {"ticks_left": burn_ticks, "damage": burn_damage}
+		_burn_timer = 0.0
+		damage_number_script.display_text(hit_pos, "BURNING!", get_tree().current_scene, Color(1.0, 0.3, 0.0), 20)
+
+	# Stagger — delays Zezlan's next fire cycle
+	var stagger_min: float = profile.get("stagger_min", 0.0)
+	var stagger_max: float = profile.get("stagger_max", 0.0)
+	if stagger_max > 0.0 and not is_destroyed:
+		var stagger := randf_range(stagger_min, stagger_max)
+		var reset_aim: bool = profile.get("stagger_reset_if_aiming", false)
+		var was_aiming := _is_aiming
+		apply_stagger(stagger, reset_aim)
+		var stagger_text := "RELOAD RESET!" if (was_aiming and reset_aim) else "STAGGERED +%.1fs" % stagger
+		damage_number_script.display_text(hit_pos, stagger_text, get_tree().current_scene, Color(0.4, 0.85, 1.0), 22)
 
 	var snapshot := get_hp_snapshot()
 	hp_changed.emit(snapshot)
@@ -251,9 +334,9 @@ func apply_rpg_structure_damage(damage: int, hit_pos: Vector3, hit_body: Node = 
 		damage_text = "CRIT! " + damage_text
 
 	# Display RPG-specific damage number (slightly larger than before, distinct orange color)
-	damage_number_script.display_text(hit_pos + Vector3.UP * 0.75, damage_text, get_tree().current_scene, Color(1.0, 0.58, 0.16), 32)
+	damage_number_script.display_text(hit_pos, damage_text, get_tree().current_scene, Color(1.0, 0.58, 0.16), 32)
 	if part_broken:
-		damage_number_script.display_text(hit_pos + Vector3.UP * 1.4, "%s BROKEN" % region, get_tree().current_scene, Color(1.0, 0.25, 0.1), 24)
+		damage_number_script.display_text(hit_pos, "%s BROKEN" % region, get_tree().current_scene, Color(1.0, 0.25, 0.1), 24)
 
 	var snapshot := get_hp_snapshot()
 	hp_changed.emit(snapshot)
@@ -300,16 +383,75 @@ func _region_to_part_key(region: String) -> String:
 		_:
 			return "torso"
 
-func _get_damage_for_region(region: String) -> int:
+func _get_damage_for_region(region: String, profile: Dictionary = {}) -> int:
 	var base := 0
 	match region:
 		"TORSO":
-			base = torso_hit_damage
+			base = profile.get("torso", torso_hit_damage)
 		"LEFT LEG", "RIGHT LEG":
-			base = leg_hit_damage
+			base = profile.get("leg", leg_hit_damage)
 		_:
-			base = fallback_hit_damage
-	return maxi(1, roundi(base * randf_range(0.8, 1.2)))
+			base = profile.get("fallback", fallback_hit_damage)
+	var variance: float = profile.get("variance", 0.20)
+	return maxi(1, roundi(base * randf_range(1.0 - variance, 1.0 + variance)))
+
+func _update_burn(delta: float) -> void:
+	if _burn_parts.is_empty() or is_destroyed:
+		return
+	_burn_timer += delta
+	if _burn_timer < _burn_interval:
+		return
+	_burn_timer = 0.0
+	var to_clear: Array = []
+	for region in _burn_parts.keys():
+		var b: Dictionary = _burn_parts[region]
+		var dmg: int = b["damage"]
+		var before := _get_part_hp(region)
+		_apply_damage_to_part(region, dmg)
+		var broke := before > 0 and _get_part_hp(region) <= 0
+		if broke:
+			_broken_parts[region] = true
+		var pos := _get_part_world_pos(region)
+		damage_number_script.display_text(pos, "BURN -%d" % dmg, get_tree().current_scene, Color(1.0, 0.35, 0.0), 22)
+		if broke:
+			damage_number_script.display_text(pos, "%s BROKEN" % region, get_tree().current_scene, Color(1.0, 0.25, 0.1), 20)
+		b["ticks_left"] -= 1
+		if b["ticks_left"] <= 0:
+			to_clear.append(region)
+	for r in to_clear:
+		_burn_parts.erase(r)
+	var legs_destroyed := (left_leg_hp <= 0 and right_leg_hp <= 0)
+	if torso_hp <= 0 or legs_destroyed:
+		_destroy_zezlan()
+	hp_changed.emit(get_hp_snapshot())
+
+func _get_part_world_pos(region: String) -> Vector3:
+	match region:
+		"TORSO":
+			return global_position + Vector3(0.0, 4.5, 1.5)
+		"LEFT LEG":
+			return global_position + Vector3(-1.5, 1.5, 1.5)
+		"RIGHT LEG":
+			return global_position + Vector3(1.5, 1.5, 1.5)
+	return global_position + Vector3(0.0, 3.0, 1.5)
+
+func _get_fragment_pool(primary_region: String) -> Array:
+	var all_regions := ["TORSO", "LEFT LEG", "RIGHT LEG"]
+	var pool: Array = []
+	for r in all_regions:
+		if r != primary_region:
+			pool.append(r)
+	return pool
+
+func _get_splash_target(primary_region: String) -> String:
+	match primary_region:
+		"TORSO", "STRUCTURE":
+			return "LEFT LEG" if randf() < 0.5 else "RIGHT LEG"
+		"LEFT LEG":
+			return "TORSO"
+		"RIGHT LEG":
+			return "TORSO"
+	return ""
 
 func _get_part_hp(region: String) -> int:
 	match region:
@@ -342,6 +484,7 @@ func _process(delta: float) -> void:
 	_update_animation(delta)
 	_update_fire_timer(delta)
 	_update_aiming(delta)
+	_update_burn(delta)
 
 func _is_match_over() -> bool:
 	if is_destroyed:
@@ -358,6 +501,19 @@ func _update_fire_timer(delta: float) -> void:
 	if _fire_timer <= 0.0:
 		_fire_timer = fire_interval
 		_start_aiming()
+
+func apply_stagger(seconds: float, reset_aim: bool = false) -> void:
+	if is_destroyed:
+		return
+	if _is_aiming and reset_aim:
+		# Cancel aim entirely — forces a full reload cycle from scratch
+		_is_aiming = false
+		_cycle_active = false
+		_fire_timer = fire_interval + seconds
+	elif _is_aiming:
+		_aim_duration += seconds
+	else:
+		_fire_timer += seconds
 
 func apply_aim_disruption(region: String) -> void:
 	if not _is_aiming:

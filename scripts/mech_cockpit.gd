@@ -18,6 +18,7 @@ const PLAYER_HIT_RESPONSE_CONTROLLER = preload("res://scripts/player_hit_respons
 const TARGET_QUERY_HELPER = preload("res://scripts/target_query_helper.gd")
 const COMBAT_VIEW_FLOW_CONTROLLER = preload("res://scripts/combat_view_flow_controller.gd")
 const VICTORY_CINEMATIC_CONTROLLER = preload("res://scripts/victory_cinematic_controller.gd")
+const AMMO_WHEEL_UI = preload("res://scripts/ammo_wheel_ui.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -204,6 +205,7 @@ var player_hit_response_controller: Node = null
 var target_query_helper: Node = null
 var combat_view_flow_controller: Node = null
 var victory_cinematic_controller: Node = null
+var ammo_wheel_ui: Control = null
 
 func _ready():
 	add_to_group("player")
@@ -234,6 +236,7 @@ func _ready():
 	call_deferred("_setup_dossier_presenter")
 	call_deferred("_finalize_combat_view_flow_refs")
 	call_deferred("_setup_victory_cinematic_controller")
+	call_deferred("_setup_ammo_wheel")
 
 func _setup_analog_heartbeat_controller() -> void:
 	analog_heartbeat_controller = ANALOG_HEARTBEAT_CONTROLLER.new()
@@ -440,6 +443,22 @@ func _setup_dossier_presenter() -> void:
 	if dossier_presenter.has_method("sync_view_visibility"):
 		dossier_presenter.sync_view_visibility(true)
 
+func _setup_ammo_wheel() -> void:
+	var canvas_layer := get_node_or_null("CanvasLayer")
+	if not canvas_layer:
+		return
+	ammo_wheel_ui = AMMO_WHEEL_UI.new()
+	ammo_wheel_ui.name = "AmmoWheelUI"
+	ammo_wheel_ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	canvas_layer.add_child(ammo_wheel_ui)
+	ammo_wheel_ui.ammo_selected.connect(func(type_key: String) -> void:
+		if player_fire_controller:
+			player_fire_controller.set_ammo_type(type_key)
+		if reload_status_controller:
+			reload_status_controller.start_reload()
+			is_reloading = true
+	)
+
 func _setup_victory_cinematic_controller() -> void:
 	var canvas_layer = get_node_or_null("CanvasLayer")
 	victory_cinematic_controller = VICTORY_CINEMATIC_CONTROLLER.new()
@@ -604,6 +623,7 @@ func _setup_big_gun():
 
 func _input(event):
 	if is_dead: return
+	if ammo_wheel_ui and ammo_wheel_ui.visible: return
 	if not _is_player_view_current():
 		return
 
@@ -618,11 +638,20 @@ func _input(event):
 			return
 			
 		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-			_begin_aim_flow()
+			if combat_view_flow_controller.combat_view_state == CombatViewState.NORMAL_VIEW:
+				_begin_aim_flow()
+			else:
+				_cancel_aim()
 			return
 		if main_camera_controller and main_camera_controller.has_method("handle_mouse_button"):
 			if main_camera_controller.handle_mouse_button(event):
 				return
+
+	if event is InputEventKey and event.keycode == KEY_Q and event.pressed and not event.echo:
+		if combat_view_flow_controller.combat_view_state == CombatViewState.NORMAL_VIEW and ammo_wheel_ui and not ammo_wheel_ui.visible:
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+			ammo_wheel_ui.open()
+			return
 
 	if event is InputEventMouseMotion and combat_view_flow_controller.combat_view_state == CombatViewState.NORMAL_VIEW and not is_reloading and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if main_camera_controller and main_camera_controller.has_method("handle_orbit_motion"):
@@ -634,6 +663,9 @@ var last_ray_result: Dictionary = {}
 
 func _process(delta):
 	if is_dead: return
+	if ammo_wheel_ui and ammo_wheel_ui.visible:
+		if combat_view_flow_controller.combat_view_state != CombatViewState.NORMAL_VIEW or _is_enemy_fire_cinematic_active():
+			ammo_wheel_ui.force_close()
 	if not is_instance_valid(camera):
 		_try_bind_main_camera()
 
@@ -831,6 +863,20 @@ func _begin_aim_flow() -> void:
 		_try_bind_main_camera()
 	if combat_view_flow_controller:
 		combat_view_flow_controller.begin_aim_flow(is_reloading, CombatViewState.NORMAL_VIEW, CombatViewState.GUN_CAM_VIEW, CombatViewState.ANALOG_AIM_VIEW, transition_time, guncam_fov)
+
+func _cancel_aim() -> void:
+	var state: int = combat_view_flow_controller.combat_view_state if combat_view_flow_controller else CombatViewState.NORMAL_VIEW
+	if state == CombatViewState.NORMAL_VIEW or state == CombatViewState.FIRING_FROM_FIRE_CAM:
+		return
+	if combat_view_flow_controller:
+		combat_view_flow_controller.reset_to_normal(CombatViewState.NORMAL_VIEW)
+	if is_instance_valid(camera):
+		camera.current = true
+	_set_analog_hud_visible(false)
+	if analog_heartbeat_controller and analog_heartbeat_controller.has_method("stop"):
+		analog_heartbeat_controller.stop()
+	if dossier_presenter and dossier_presenter.has_method("hide_target_dossier"):
+		dossier_presenter.hide_target_dossier()
 
 func _enter_analog_aim_view() -> void:
 	if combat_view_flow_controller:

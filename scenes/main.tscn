@@ -381,7 +381,7 @@ near = 1.0
 far = 2000.0
 
 [node name="RightShoulder" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR" index="1" unique_id=931325009]
-transform = Transform3D(-0.789408, 0.26899946, -0.55179244, -0.2624001, -0.9604828, -0.092840604, -0.5549611, 0.071501225, 0.8287983, 0.035264492, 0.031585455, 0.03621483)
+transform = Transform3D(-0.78493613, 0.28667217, -0.54926735, -0.277817, -0.9552522, -0.10154569, -0.55379903, 0.0728889, 0.8294543, 0.035264492, 0.031585217, 0.03621483)
 
 [node name="ShoulderL" parent="WIPtestmech/Armature/Torso2/TorsoL" parent_id_path=PackedInt32Array(1679724251, 2095289501) index="0" unique_id=682212612]
 transform = Transform3D(0.41181862, 0.895979, 0.16621366, -0.87424207, 0.33699587, 0.34947762, 0.25711128, -0.28923234, 0.92208385, -1.1920929e-07, 0.51991653, 4.7683716e-07)
@@ -592,8 +592,8 @@ script = ExtResource("18_pause_menu")
 [node name="zezlan" parent="." unique_id=1717272107 instance=ExtResource("13_trceg")]
 transform = Transform3D(-5, 0, -4.371139e-07, 0, 5, 0, 4.371139e-07, 0, -5, 34.724888, -0.4905479, 154.95802)
 script = ExtResource("20_zezlan_movement")
-fire_interval = 4.0
-initial_fire_delay = 1.0
+fire_interval = 9.0
+initial_fire_delay = 9.0
 shell_speed = 150.0
 max_cone_angle_deg = 3.0
 local_travel_direction = Vector3(0, 0, 1)
