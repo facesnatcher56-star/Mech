@@ -140,14 +140,14 @@ var _pulse_t: float        = 0.0
 var _keys: Array           = []
 
 func _ready() -> void:
-	_keys = AMMO_TYPES.keys()
+	refresh()
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process(false)
 
 func open() -> void:
-	_keys = AMMO_TYPES.keys()
+	refresh()
 	_hovered_index = _keys.find(_selected_key)
 	_pulse_t = 0.0
 	visible = true
@@ -155,6 +155,22 @@ func open() -> void:
 	set_process(true)
 	get_tree().paused = true
 	queue_redraw()
+
+func refresh() -> void:
+	var old_keys = _keys.duplicate()
+	_keys = []
+	var state = _get_run_state()
+	if not state:
+		# Fallback if state is missing
+		_keys = ["STANDARD"]
+		return
+		
+	for key in AMMO_TYPES.keys():
+		if state.has_ammo(key):
+			_keys.append(key)
+	
+	if _keys != old_keys:
+		queue_redraw()
 
 func force_close() -> void:
 	visible = false
@@ -165,7 +181,10 @@ func force_close() -> void:
 
 func _confirm_selection() -> void:
 	if _hovered_index >= 0 and _hovered_index < _keys.size():
-		_selected_key = _keys[_hovered_index]
+		var key = _keys[_hovered_index]
+		var state = _get_run_state()
+		if state and state.has_ammo(key):
+			_selected_key = key
 	force_close()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	ammo_selected.emit(_selected_key)
@@ -190,6 +209,9 @@ func _gui_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			_confirm_selection()
 
+func _get_run_state() -> Node:
+	return get_node_or_null("/root/RunState")
+
 # ── Drawing ──────────────────────────────────────────────────────────────────
 
 func _draw() -> void:
@@ -202,12 +224,18 @@ func _draw() -> void:
 	draw_circle(c, WHEEL_RADIUS, BG_COLOR)
 
 	var slice := TAU / n
+	var state = _get_run_state()
 
 	for i in n:
 		var key: String = _keys[i]
 		var info: Dictionary = AMMO_TYPES[key]
-		var hot := (i == _hovered_index)
+		var has_ammo: bool = state.has_ammo(key) if state else true
+		var hot: bool = (i == _hovered_index) and has_ammo
 		var seg_color: Color = info["color"]
+
+		if not has_ammo:
+			seg_color = seg_color.lerp(Color.BLACK, 0.6)
+			seg_color.a = 0.4
 
 		var angle_start := i * slice - TAU / 4.0 + WEDGE_GAP_RAD * 0.5
 		var angle_end   := angle_start + slice - WEDGE_GAP_RAD
@@ -240,9 +268,23 @@ func _draw() -> void:
 		var lbl: String = info["label"]
 		var lw        := font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x
 		var txt_col: Color = info["color"] if hot else TEXT_DIM
-		txt_col.a     = 1.0 if hot else 0.7
+		if not has_ammo:
+			txt_col = Color(0.3, 0.3, 0.3, 0.5)
+		else:
+			txt_col.a = 1.0 if hot else 0.7
+		
 		draw_string(font, lp - Vector2(lw * 0.5, -fsize * 0.35), lbl,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, fsize, txt_col)
+		
+		# Draw ammo count
+		var count = state.get_ammo_count(key) if state else 0
+		var count_str = "∞" if count == -1 else str(count)
+		var count_fsize := 14
+		var cw := font.get_string_size(count_str, HORIZONTAL_ALIGNMENT_LEFT, -1, count_fsize).x
+		var count_col := txt_col
+		count_col.a *= 0.8
+		draw_string(font, lp + Vector2(-cw * 0.5, fsize * 2.0), count_str,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, count_fsize, count_col)
 
 	draw_circle(c, INNER_RADIUS, INNER_BG)
 	draw_arc(c, INNER_RADIUS, 0.0, TAU, 48, STROKE_DIM, 2.0)

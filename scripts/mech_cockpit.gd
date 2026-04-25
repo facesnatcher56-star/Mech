@@ -1003,6 +1003,8 @@ func _perform_actual_shot(target_point: Vector3, will_hit_enemy: bool, focal_poi
 	_refresh_player_fire_controller()
 	if player_fire_controller:
 		player_fire_controller.perform_actual_shot(target_point, will_hit_enemy, focal_point, impact_anchor)
+		if ammo_wheel_ui:
+			ammo_wheel_ui.call("refresh")
 
 func _start_weapon_reload() -> void:
 	if reload_status_controller:

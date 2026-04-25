@@ -116,7 +116,16 @@ func perform_actual_shot(target_point: Vector3, will_hit_enemy: bool, focal_poin
 	if not cockpit or not muzzle:
 		return
 
-	var shell = AMMO_SCENES[_current_ammo].instantiate()
+	# Check and consume ammo
+	var ammo_to_use = _current_ammo
+	var state = get_node_or_null("/root/RunState")
+	if state:
+		if not state.has_ammo(ammo_to_use):
+			ammo_to_use = "STANDARD"
+			_current_ammo = "STANDARD"
+		state.consume_ammo(ammo_to_use)
+	
+	var shell = AMMO_SCENES[ammo_to_use].instantiate()
 	shell.shooter = cockpit
 	shell.is_player_shot = true
 	shell.is_destined_for_hit = will_hit_enemy
