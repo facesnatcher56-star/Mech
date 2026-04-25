@@ -20,7 +20,32 @@ const AMMO_PROFILES: Dictionary = {
 }
 const DAMAGE_NUMBER = preload("res://scripts/damage_number.gd")
 
+const AIM_CRIT_START := 0.20
+const AIM_CRIT_BASE  := 0.05
+const AIM_CRIT_DECAY := 3.0
+
 var _current_ammo: String = "STANDARD"
+var _aim_crit_bonus: float = 0.0
+var _aim_crit_active: bool = false
+
+signal aim_crit_changed(crit_total: float)
+
+func begin_aim_crit_window() -> void:
+	_aim_crit_bonus = AIM_CRIT_START - AIM_CRIT_BASE
+	_aim_crit_active = true
+	aim_crit_changed.emit(AIM_CRIT_START)
+
+func reset_aim_crit() -> void:
+	_aim_crit_bonus = 0.0
+	_aim_crit_active = false
+
+func _process(delta: float) -> void:
+	if not _aim_crit_active:
+		return
+	_aim_crit_bonus = maxf(0.0, _aim_crit_bonus - (AIM_CRIT_START - AIM_CRIT_BASE) / AIM_CRIT_DECAY * delta)
+	aim_crit_changed.emit(AIM_CRIT_BASE + _aim_crit_bonus)
+	if _aim_crit_bonus == 0.0:
+		_aim_crit_active = false
 
 func set_ammo_type(type_key: String) -> void:
 	if AMMO_SCENES.has(type_key):
@@ -130,7 +155,8 @@ func perform_actual_shot(target_point: Vector3, will_hit_enemy: bool, focal_poin
 	shell.is_player_shot = true
 	shell.is_destined_for_hit = will_hit_enemy
 	shell.speed = projectile_speed
-	var profile: Dictionary = AMMO_PROFILES.get(_current_ammo, AMMO_PROFILES["STANDARD"]).duplicate()
+	var profile: Dictionary = AMMO_PROFILES.get(ammo_to_use, AMMO_PROFILES["STANDARD"]).duplicate()
+	profile["crit_chance"] = minf(1.0, profile.get("crit_chance", AIM_CRIT_BASE) + _aim_crit_bonus)
 	shell.has_hit.connect(_on_shell_hit.bind(profile))
 
 	cockpit.get_tree().root.add_child(shell)

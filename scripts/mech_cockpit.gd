@@ -20,6 +20,7 @@ const COMBAT_VIEW_FLOW_CONTROLLER = preload("res://scripts/combat_view_flow_cont
 const VICTORY_CINEMATIC_CONTROLLER = preload("res://scripts/victory_cinematic_controller.gd")
 const AMMO_WHEEL_UI = preload("res://scripts/ammo_wheel_ui.gd")
 const POST_BATTLE_SCREEN_UI = preload("res://scripts/post_battle_screen_ui.gd")
+const CRIT_CHANCE_HUD = preload("res://scripts/crit_chance_hud.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -207,6 +208,7 @@ var target_query_helper: Node = null
 var combat_view_flow_controller: Node = null
 var victory_cinematic_controller: Node = null
 var ammo_wheel_ui: Control = null
+var crit_chance_hud: Control = null
 
 func _ready():
 	add_to_group("player")
@@ -238,6 +240,7 @@ func _ready():
 	call_deferred("_finalize_combat_view_flow_refs")
 	call_deferred("_setup_victory_cinematic_controller")
 	call_deferred("_setup_ammo_wheel")
+	call_deferred("_setup_crit_hud")
 
 func _setup_analog_heartbeat_controller() -> void:
 	analog_heartbeat_controller = ANALOG_HEARTBEAT_CONTROLLER.new()
@@ -459,6 +462,20 @@ func _setup_ammo_wheel() -> void:
 			reload_status_controller.start_reload()
 			is_reloading = true
 	)
+
+func _setup_crit_hud() -> void:
+	var canvas_layer := get_node_or_null("CanvasLayer")
+	if not canvas_layer:
+		return
+	crit_chance_hud = CRIT_CHANCE_HUD.new()
+	crit_chance_hud.name = "CritChanceHUD"
+	crit_chance_hud.visible = false
+	canvas_layer.add_child(crit_chance_hud)
+	if player_fire_controller:
+		player_fire_controller.aim_crit_changed.connect(func(crit: float) -> void:
+			if crit_chance_hud:
+				crit_chance_hud.update_crit(crit)
+		)
 
 func _setup_victory_cinematic_controller() -> void:
 	var canvas_layer = get_node_or_null("CanvasLayer")
@@ -804,6 +821,13 @@ func _get_fire_camera_fov() -> float:
 func _set_analog_hud_visible(is_visible: bool) -> void:
 	if analog_reticle_hud:
 		analog_reticle_hud.visible = is_visible
+	if crit_chance_hud:
+		crit_chance_hud.visible = is_visible
+	if player_fire_controller:
+		if is_visible:
+			player_fire_controller.begin_aim_crit_window()
+		else:
+			player_fire_controller.reset_aim_crit()
 	if dossier_presenter and dossier_presenter.has_method("sync_view_visibility"):
 		dossier_presenter.sync_view_visibility(combat_view_flow_controller.combat_view_state == CombatViewState.NORMAL_VIEW)
 
