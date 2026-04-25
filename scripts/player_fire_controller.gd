@@ -164,6 +164,7 @@ func perform_actual_shot(target_point: Vector3, will_hit_enemy: bool, focal_poin
 	shell.speed = projectile_speed
 	var profile: Dictionary = AMMO_PROFILES.get(ammo_to_use, AMMO_PROFILES["STANDARD"]).duplicate()
 	profile["crit_chance"] = minf(1.0, profile.get("crit_chance", AIM_CRIT_BASE) + _aim_crit_bonus)
+	profile["ammo_key"] = ammo_to_use
 	shell.has_hit.connect(_on_shell_hit.bind(profile))
 
 	cockpit.get_tree().root.add_child(shell)
@@ -202,7 +203,7 @@ func _on_shell_hit(body: Node, hit_pos: Vector3, profile: Dictionary = {}) -> vo
 		hit_sound.play()
 
 	if combat_bark_ui:
-		combat_bark_ui.show_result(is_enemy, bark_part_name if is_enemy else "")
+		combat_bark_ui.show_result(is_enemy, bark_part_name if is_enemy else "", profile.get("ammo_key", ""))
 		if not is_enemy:
 			_show_direct_miss(hit_pos)
 
