@@ -35,6 +35,24 @@ func reset() -> void:
 	left_leg_hp = max_left_leg_hp
 	right_leg_hp = max_right_leg_hp
 
+func get_current_hp() -> Dictionary:
+	return {
+		"torso": torso_hp,
+		"left_arm": left_arm_hp,
+		"right_arm": right_arm_hp,
+		"left_leg": left_leg_hp,
+		"right_leg": right_leg_hp,
+	}
+
+func restore(hp_dict: Dictionary) -> void:
+	is_dead = false
+	damage_flash_timer = 0.0
+	torso_hp     = clampi(int(hp_dict.get("torso",     max_torso_hp)),     0, max_torso_hp)
+	left_arm_hp  = clampi(int(hp_dict.get("left_arm",  max_left_arm_hp)),  0, max_left_arm_hp)
+	right_arm_hp = clampi(int(hp_dict.get("right_arm", max_right_arm_hp)), 0, max_right_arm_hp)
+	left_leg_hp  = clampi(int(hp_dict.get("left_leg",  max_left_leg_hp)),  0, max_left_leg_hp)
+	right_leg_hp = clampi(int(hp_dict.get("right_leg", max_right_leg_hp)), 0, max_right_leg_hp)
+
 func update(delta: float) -> void:
 	if damage_flash_timer > 0.0:
 		damage_flash_timer = max(0.0, damage_flash_timer - delta)

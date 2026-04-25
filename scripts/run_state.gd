@@ -45,3 +45,19 @@ func reset_ammo() -> void:
 		"CONCUSSION": 4,
 		"BREACH": 5
 	}
+
+# ── Player HP ─────────────────────────────────────────────────────────────────
+
+var player_hp: Dictionary = {}
+
+func has_saved_hp() -> bool:
+	return not player_hp.is_empty()
+
+func get_player_hp() -> Dictionary:
+	return player_hp
+
+func save_player_hp(hp_dict: Dictionary) -> void:
+	player_hp = hp_dict
+
+func reset_player_hp() -> void:
+	player_hp = {}

@@ -503,7 +503,17 @@ func _setup_player_damage_model() -> void:
 		"max_right_leg_hp": max_right_leg_hp,
 		"hit_damage": hit_damage
 	})
-	player_damage_model.reset()
+	var _run_state := get_node_or_null("/root/RunState")
+	if _run_state and _run_state.has_saved_hp():
+		player_damage_model.restore(_run_state.get_player_hp())
+	else:
+		player_damage_model.reset()
+	player_damage_model.damaged.connect(func(snapshot: Dictionary) -> void:
+		if not snapshot.get("destroyed", false):
+			var rs := get_node_or_null("/root/RunState")
+			if rs:
+				rs.save_player_hp(player_damage_model.get_current_hp())
+	)
 	player_damage_model.destroyed.connect(_on_player_destroyed)
 	is_dead = player_damage_model.is_dead
 	_refresh_player_hit_response_controller()
