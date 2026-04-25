@@ -592,12 +592,13 @@ script = ExtResource("18_pause_menu")
 [node name="zezlan" parent="." unique_id=1717272107 instance=ExtResource("13_trceg")]
 transform = Transform3D(-5, 0, -4.371139e-07, 0, 5, 0, 4.371139e-07, 0, -5, 34.724888, -0.4905479, 154.95802)
 script = ExtResource("20_zezlan_movement")
-fire_interval = 8.0
+fire_interval = 4.0
 initial_fire_delay = 1.0
-shell_speed = 100.0
+shell_speed = 150.0
 max_cone_angle_deg = 3.0
 local_travel_direction = Vector3(0, 0, 1)
 max_travel_speed = 8.0
+max_torso_hp = 100
 
 [node name="TorsoL" parent="zezlan/Armature" parent_id_path=PackedInt32Array(1717272107, 527061528) index="1" unique_id=1867708599]
 transform = Transform3D(0.01070883, 0.999874, 0.011718034, -1.48179315e-05, -0.011718547, 0.9999313, 0.99994266, -0.010708269, -0.00011067588, 0, -0.040443838, -0.12277981)

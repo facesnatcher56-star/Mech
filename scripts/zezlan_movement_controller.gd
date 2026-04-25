@@ -115,6 +115,7 @@ var _broken_parts := {}
 var damage_number_script = preload("res://scripts/damage_number.gd")
 
 signal hp_changed(snapshot: Dictionary)
+signal zezlan_destroyed
 
 func _ready() -> void:
 	add_to_group(collision_group_name)
@@ -333,6 +334,7 @@ func _destroy_zezlan() -> void:
 		animation_player.speed_scale = 0.0
 		if stop_animation_when_idle and animation_player.is_playing():
 			animation_player.stop()
+	zezlan_destroyed.emit()
 
 func _process(delta: float) -> void:
 	_update_throttle_input(delta)
@@ -341,8 +343,14 @@ func _process(delta: float) -> void:
 	_update_fire_timer(delta)
 	_update_aiming(delta)
 
+func _is_match_over() -> bool:
+	if is_destroyed:
+		return true
+	var player := get_tree().get_first_node_in_group("player")
+	return player != null and player.get("is_dead") == true
+
 func _update_fire_timer(delta: float) -> void:
-	if is_destroyed or _is_aiming or _cycle_active:
+	if _is_match_over() or _is_aiming or _cycle_active:
 		return
 	if get_tree().get_nodes_in_group("shell_in_flight").size() > 0:
 		return
@@ -367,6 +375,10 @@ func _start_aiming() -> void:
 
 func _update_aiming(delta: float) -> void:
 	if not _is_aiming:
+		return
+	if _is_match_over():
+		_is_aiming = false
+		_cycle_active = false
 		return
 	if get_tree().get_nodes_in_group("shell_in_flight").size() > 0:
 		return

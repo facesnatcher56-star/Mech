@@ -84,6 +84,20 @@ func show_result(is_hit: bool, body_part_name: String = ""):
 		else:
 			label.text = hit_generic_lines.pick_random()
 
+var victory_lines = [
+	"Target neutralized.",
+	"Zezlan is down. Mission complete.",
+	"Enemy destroyed. Good work.",
+	"Target eliminated. Stand down.",
+	"Zezlan's offline. That's a kill."
+]
+
+func show_victory() -> void:
+	is_high_priority_active = true
+	set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE, 0)
+	label.text = victory_lines.pick_random()
+	_fade_in()
+
 func hide_bark():
 	_fade_out()
 

@@ -17,6 +17,7 @@ const GROUND_ALIGNMENT_CONTROLLER = preload("res://scripts/ground_alignment_cont
 const PLAYER_HIT_RESPONSE_CONTROLLER = preload("res://scripts/player_hit_response_controller.gd")
 const TARGET_QUERY_HELPER = preload("res://scripts/target_query_helper.gd")
 const COMBAT_VIEW_FLOW_CONTROLLER = preload("res://scripts/combat_view_flow_controller.gd")
+const VICTORY_CINEMATIC_CONTROLLER = preload("res://scripts/victory_cinematic_controller.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -202,6 +203,7 @@ var ground_alignment_controller: Node = null
 var player_hit_response_controller: Node = null
 var target_query_helper: Node = null
 var combat_view_flow_controller: Node = null
+var victory_cinematic_controller: Node = null
 
 func _ready():
 	add_to_group("player")
@@ -231,6 +233,7 @@ func _ready():
 	_setup_player_fire_controller()
 	call_deferred("_setup_dossier_presenter")
 	call_deferred("_finalize_combat_view_flow_refs")
+	call_deferred("_setup_victory_cinematic_controller")
 
 func _setup_analog_heartbeat_controller() -> void:
 	analog_heartbeat_controller = ANALOG_HEARTBEAT_CONTROLLER.new()
@@ -436,6 +439,24 @@ func _setup_dossier_presenter() -> void:
 	_refresh_player_hit_response_controller()
 	if dossier_presenter.has_method("sync_view_visibility"):
 		dossier_presenter.sync_view_visibility(true)
+
+func _setup_victory_cinematic_controller() -> void:
+	var canvas_layer = get_node_or_null("CanvasLayer")
+	victory_cinematic_controller = VICTORY_CINEMATIC_CONTROLLER.new()
+	victory_cinematic_controller.name = "VictoryCinematicController"
+	add_child(victory_cinematic_controller)
+	victory_cinematic_controller.configure(camera, canvas_layer, combat_bark_ui)
+	# Connect to every node in the enemy group that has the zezlan_destroyed signal
+	for node in get_tree().get_nodes_in_group("enemy"):
+		if node.has_signal("zezlan_destroyed"):
+			node.zezlan_destroyed.connect(_on_zezlan_destroyed)
+
+func _on_zezlan_destroyed() -> void:
+	is_dead = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	var zezlan := get_tree().get_first_node_in_group("enemy") as Node3D
+	if victory_cinematic_controller and is_instance_valid(zezlan):
+		victory_cinematic_controller.begin(zezlan)
 
 func _setup_player_damage_model() -> void:
 	player_damage_model = PLAYER_DAMAGE_MODEL.new()

@@ -12,6 +12,7 @@ const EXPLOSION_SCENE = preload("res://scenes/explosion.tscn")
 
 func _ready() -> void:
 	swept_collision_enabled = true
+	is_rpg = true
 	super._ready()
 	remove_from_group("shell_in_flight")
 	if smoke_trail:

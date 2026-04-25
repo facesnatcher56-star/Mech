@@ -19,6 +19,7 @@ const IMPACT_VFX = preload("res://scenes/impact_vfx.tscn")
 var shooter: Node3D = null
 var is_player_shot: bool = false
 var is_destined_for_hit: bool = false
+var is_rpg: bool = false
 
 signal has_hit(body, hit_pos)
 
@@ -131,9 +132,9 @@ func _resolve_hit(body, hit_pos: Vector3, source: String) -> void:
 	_spawn_hit_vfx(hit_pos)
 	
 	# 2. Hit Logic
-	# Player shots: damage is handled by the has_hit signal (player_fire_controller._on_shell_hit).
-	# Enemy shots: no signal handler exists, so walk up the tree to apply damage directly.
-	if not is_player_shot:
+	# Player shots and RPG shots: damage handled by has_hit signal listeners.
+	# Enemy cannon shots only: walk up the tree to apply damage directly.
+	if not is_player_shot and not is_rpg:
 		var target = body
 		while target != null:
 			if target.has_method("hit") or target.has_method("part_hit"):
