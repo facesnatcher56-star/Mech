@@ -111,6 +111,14 @@ var breach_followup_lines = [
 	"Armor gave way!", "Beautiful follow-up!", "Crack turned into a rupture!"
 ]
 
+var crit_hit_lines = [
+	"Critical hit!", "That hit something important!", "Direct critical!",
+	"Major damage confirmed!", "That one went deep!", "Critical damage!",
+	"That punched through clean!", "Big hit! Keep pressure!", "Something broke inside!",
+	"That was the shot!", "Critical strike confirmed!", "Armor failed!",
+	"That tore through!", "Internal damage spike!", "That hurt them bad!"
+]
+
 # ── Interface ─────────────────────────────────────────────────────────────────
 
 func _ready():
@@ -134,13 +142,19 @@ func show_commit():
 	label.text = commit_lines.pick_random()
 	_fade_in()
 
-func show_result(is_hit: bool, body_part_name: String = "", ammo_key: String = "", triggered_crack: bool = false) -> void:
+func show_result(is_hit: bool, body_part_name: String = "", ammo_key: String = "", triggered_crack: bool = false, is_crit: bool = false) -> void:
 	if is_high_priority_active: return
 	if not is_hit:
 		label.text = miss_lines.pick_random()
 		return
 
-	# Ammo-specific barks always take priority on a hit
+	# Crit barks take highest priority
+	if is_crit:
+		label.text = crit_hit_lines.pick_random()
+		_fade_in()
+		return
+
+	# Ammo-specific barks take next priority
 	var ammo_bark := _get_ammo_bark(ammo_key, body_part_name, triggered_crack)
 	if ammo_bark != "":
 		label.text = ammo_bark

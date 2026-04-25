@@ -204,7 +204,8 @@ func _on_shell_hit(body: Node, hit_pos: Vector3, profile: Dictionary = {}) -> vo
 
 	if combat_bark_ui:
 		var triggered_crack := bool(damage_result.get("triggered_crack", false))
-		combat_bark_ui.show_result(is_enemy, bark_part_name if is_enemy else "", profile.get("ammo_key", ""), triggered_crack)
+		var is_crit := bool(damage_result.get("is_crit", false))
+		combat_bark_ui.show_result(is_enemy, bark_part_name if is_enemy else "", profile.get("ammo_key", ""), triggered_crack, is_crit)
 		if not is_enemy:
 			_show_direct_miss(hit_pos)
 
