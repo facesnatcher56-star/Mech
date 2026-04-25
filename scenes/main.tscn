@@ -295,6 +295,7 @@ gizmo_extents = 2.0
 
 [node name="VisibleDragDot" type="MeshInstance3D" parent="AimCameraTarget" unique_id=3000002]
 mesh = SubResource("SphereMesh_aim_target")
+visible = false
 
 [node name="WorldSetup" type="Node" parent="." unique_id=812988922]
 script = ExtResource("7_world_setup")
