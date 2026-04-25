@@ -70,10 +70,10 @@ func _on_body_entered(body):
 			print("[SHELL TRACE] ignored shooter body_entered body=", body.name)
 		return
 
-	if collision_debug_enabled:
+	if not is_player_shot:
+		print("[ZEZLAN SHELL] hit body='%s' groups=%s pos=%s" % [body.name, str(body.get_groups()), _fmt_vec(global_position)])
+	elif collision_debug_enabled:
 		print("[SHELL TRACE] AREA HIT body=", _describe_body(body), " pos=", _fmt_vec(global_position), " prev=", _fmt_vec(_last_position))
-	else:
-		print("[SHELL] Collision with: ", body.name, " Groups: ", body.get_groups())
 	var hit_pos = global_position
 	_resolve_hit(body, hit_pos, "area")
 
@@ -130,20 +130,23 @@ func _resolve_hit(body, hit_pos: Vector3, source: String) -> void:
 	# 1. Visual Payoff
 	_spawn_hit_vfx(hit_pos)
 	
-	# 2. Hit Logic (Recursive search for a 'hit' method)
-	var target = body
-	while target != null:
-		if target.has_method("hit") or target.has_method("part_hit"):
-			if collision_debug_enabled:
-				print("[SHELL TRACE] resolve source=", source, " target_method_node=", target.name, " hit_pos=", _fmt_vec(hit_pos))
-			if target.has_method("hit"):
-				target.hit(body)
-			else:
-				target.part_hit(body)
-			break
-		target = target.get_parent()
-	if collision_debug_enabled and target == null:
-		print("[SHELL TRACE] resolve source=", source, " no hit()/part_hit() owner found for body=", _describe_body(body))
+	# 2. Hit Logic
+	# Player shots: damage is handled by the has_hit signal (player_fire_controller._on_shell_hit).
+	# Enemy shots: no signal handler exists, so walk up the tree to apply damage directly.
+	if not is_player_shot:
+		var target = body
+		while target != null:
+			if target.has_method("hit") or target.has_method("part_hit"):
+				if collision_debug_enabled:
+					print("[SHELL TRACE] resolve source=", source, " target_method_node=", target.name, " hit_pos=", _fmt_vec(hit_pos))
+				if target.has_method("hit"):
+					target.hit(body)
+				else:
+					target.part_hit(body, hit_pos)
+				break
+			target = target.get_parent()
+		if collision_debug_enabled and target == null:
+			print("[SHELL TRACE] resolve source=", source, " no hit()/part_hit() owner found for body=", _describe_body(body))
 	
 	# 3. Cleanup
 	queue_free()

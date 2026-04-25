@@ -933,11 +933,13 @@ func _start_weapon_reload() -> void:
 		reload_timer = 0.0
 		current_spread = max_spread
 
-func part_hit(body: Node = null):
+func part_hit(body: Node = null, hit_pos: Vector3 = Vector3.ZERO):
 	_hit_during_enemy_cinematic = true
 	_refresh_player_hit_response_controller()
 	if player_hit_response_controller:
 		var hit_region := _classify_player_hit(body)
+		if randf() < 0.05:
+			hit_region = "WEAK SPOT"
 		is_dead = player_hit_response_controller.apply_hit(camera, is_dead, hit_region)
 		if not is_dead:
 			_apply_aim_disruption_on_hit(hit_region)
@@ -945,11 +947,12 @@ func part_hit(body: Node = null):
 func _classify_player_hit(body: Node) -> String:
 	if not body:
 		return "BODY"
-	var node_name := body.name.to_lower()
-	if "weak" in node_name or "box" in node_name:
-		return "WEAK SPOT"
-	if "arm" in node_name or "shoulder" in node_name or "gun" in node_name:
-		return "ARM"
+	var node := body
+	while node:
+		var node_name := node.name.to_lower()
+		if "arm" in node_name or "shoulder" in node_name or "gun" in node_name:
+			return "ARM"
+		node = node.get_parent()
 	return "BODY"
 
 func _apply_aim_disruption_on_hit(region: String) -> void:

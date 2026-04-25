@@ -258,12 +258,6 @@ _data = {
 &"WalkF": SubResource("Animation_yc10j")
 }
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_zezlan_hitbox"]
-size = Vector3(0.030041505, 0.029003907, 0.018823244)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_user_hitbox"]
-size = Vector3(0.48, 0.12, 0.12)
-
 [node name="Main" type="Node3D" unique_id=2077343884]
 
 [node name="REF_Alpha" type="Marker3D" parent="." unique_id=1714902305]
@@ -355,10 +349,10 @@ smoke_scale = 3.0
 particle_amount = 40
 
 [node name="Torso2" parent="WIPtestmech/Armature" parent_id_path=PackedInt32Array(1679724251, 359783737) index="1" unique_id=654991229]
-transform = Transform3D(0.99999976, 0, 0, 0, 0.9983547, 0.057333976, 0, -0.05733397, 0.9983548, 0.28354645, -0.09670848, -0.78216624)
+transform = Transform3D(0.99999976, 0, 0, 0, 0.99835455, 0.05733397, 0, -0.057333965, 0.9983547, 0.28354645, -0.09670848, -0.78216624)
 
 [node name="ShoulderR" parent="WIPtestmech/Armature/Torso2/TorsoR" parent_id_path=PackedInt32Array(1679724251, 1891064601) index="0" unique_id=696837719]
-transform = Transform3D(0.30074304, -0.95358914, 0.014828168, 0.9507704, 0.30100033, 0.07370674, -0.07474926, -0.008068612, 0.997169, 5.9604645e-08, 0.45995998, 1.1920929e-07)
+transform = Transform3D(0.300743, -0.95358914, 0.014828166, 0.95077026, 0.30100033, 0.073706724, -0.07474925, -0.008068612, 0.9971689, 5.9604645e-08, 0.45995998, 1.1920929e-07)
 
 [node name="GunArm" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR" index="0" unique_id=914604739]
 transform = Transform3D(0.797691, 0.28861302, -0.5295198, -0.56406015, 0.046410825, -0.8244283, -0.21336527, 0.95632035, 0.19981664, -2.6077032e-08, 0.2282031, -3.259629e-08)
@@ -396,7 +390,7 @@ transform = Transform3D(0.41181862, 0.895979, 0.16621366, -0.87424207, 0.3369958
 transform = Transform3D(0.05258519, 0.108316615, 0.9927272, 0.054754585, -0.99291766, 0.10543757, 0.99712676, 0.04881119, -0.058142994, 0, 0.28172442, -4.7683716e-07)
 
 [node name="LegR" parent="WIPtestmech/Armature/TorsoLowerR" parent_id_path=PackedInt32Array(1679724251, 583431586) index="0" unique_id=1696298831]
-transform = Transform3D(0.9960359, -0.08893474, -0.0016863609, 0.0048570707, 0.03544772, 0.9993596, -0.08881806, -0.99540603, 0.03573918, 4.7683716e-07, 0.25640202, -1.1920929e-07)
+transform = Transform3D(0.9960359, -0.088934734, -0.0016863609, 0.0048570707, 0.035447717, 0.9993596, -0.08881806, -0.9954059, 0.03573918, 4.7683716e-07, 0.25640202, -1.1920929e-07)
 
 [node name="FootR" parent="WIPtestmech/Armature/TorsoLowerR/LegR" index="0" unique_id=776964756]
 transform = Transform3D(0.91616416, -0.3997972, -0.028380089, 0.39979723, 0.90655696, 0.13533881, -0.02837991, -0.13533884, 0.9903928, 2.3841858e-07, 0.2732985, 0)
@@ -601,7 +595,7 @@ script = ExtResource("20_zezlan_movement")
 fire_interval = 8.0
 initial_fire_delay = 1.0
 shell_speed = 100.0
-max_cone_angle_deg = 10.0
+max_cone_angle_deg = 3.0
 local_travel_direction = Vector3(0, 0, 1)
 max_travel_speed = 8.0
 
@@ -723,19 +717,6 @@ transform = Transform3D(0.01183311, 0, 0.99992996, 0, 1, 0, -0.99992996, 0, 0.01
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=2003300415]
 libraries/ = SubResource("AnimationLibrary_jscy8")
-
-[node name="ZezlanBox" type="StaticBody3D" parent="." unique_id=4000001 groups=["enemy"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.701584, 5.037353, 152.92725)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ZezlanBox" unique_id=1028543035]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.024173737, 0.019556522, 0.15652466)
-shape = SubResource("BoxShape3D_zezlan_hitbox")
-
-[node name="UserBox" type="StaticBody3D" parent="." unique_id=4000002 groups=["player"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.138334, 5.768282, -14.155757)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="UserBox" unique_id=1874413222]
-shape = SubResource("BoxShape3D_user_hitbox")
 
 [editable path="WIPtestmech"]
 [editable path="zezlan"]

@@ -134,8 +134,9 @@ func _reset_hp_pools() -> void:
 	is_destroyed = false
 	_broken_parts.clear()
 
-func part_hit(body: Node = null) -> void:
-	apply_shell_damage(body, global_position + Vector3.UP * 1.5)
+func part_hit(body: Node = null, hit_pos: Vector3 = Vector3.ZERO) -> void:
+	var pos := hit_pos if hit_pos != Vector3.ZERO else global_position + Vector3.UP * 1.5
+	apply_shell_damage(body, pos)
 
 func apply_shell_damage(hit_body: Node, hit_pos: Vector3) -> Dictionary:
 	if is_destroyed:
@@ -147,14 +148,12 @@ func apply_shell_damage(hit_body: Node, hit_pos: Vector3) -> Dictionary:
 			"snapshot": get_hp_snapshot()
 		}
 
-	var region := _get_hit_region(hit_body)
+	var region := _get_hit_region(hit_body, hit_pos)
 	var part_key := _region_to_part_key(region)
 	var damage := _get_damage_for_region(region)
-	var is_crit := (region == "WEAK SPOT")
+	var is_crit := randf() < 0.05
 	if is_crit:
 		damage *= 2
-		region = "TORSO" # Redirect weak spot damage to torso
-		part_key = "torso"
 
 	var before_part_hp := _get_part_hp(region)
 
@@ -228,14 +227,10 @@ func apply_rpg_structure_damage(damage: int, hit_pos: Vector3, hit_body: Node = 
 
 	var region := "TORSO"
 	var part_key := "torso"
-	var is_crit := false
 	if hit_body:
-		region = _get_hit_region(hit_body)
+		region = _get_hit_region(hit_body, hit_pos)
 		part_key = _region_to_part_key(region)
-		if region == "WEAK SPOT":
-			is_crit = true
-			region = "TORSO"
-			part_key = "torso"
+	var is_crit := randf() < 0.05
 
 	var applied_damage: int = maxi(0, damage)
 	if is_crit:
@@ -280,12 +275,10 @@ func _apply_damage_to_part(region: String, damage: int) -> void:
 		"RIGHT LEG":
 			right_leg_hp = maxi(0, right_leg_hp - damage)
 
-func _get_hit_region(hit_body: Node) -> String:
+func _get_hit_region(hit_body: Node, hit_pos: Vector3 = Vector3.ZERO) -> String:
 	var node := hit_body
 	while node:
 		var node_name := node.name.to_lower()
-		if "weak" in node_name or "box" in node_name:
-			return "WEAK SPOT"
 		if "torso" in node_name:
 			return "TORSO"
 		if "footl" in node_name or "kneel" in node_name or "legl" in node_name:
@@ -407,13 +400,15 @@ func _launch_shell(player: Node3D) -> void:
 	var aim_pos    := player.global_position + Vector3.UP * aim_height_offset
 	var aim_range     := maxf(0.001, max_aim_time - min_aim_time)
 	var t             := clampf((_aim_timer - min_aim_time) / aim_range, 0.0, 1.0)
-	var accuracy      := t * t
-	var cone_half_rad := deg_to_rad(max_cone_angle_deg * (1.0 - accuracy))
+	var cone_half_rad := deg_to_rad(max_cone_angle_deg * (1.0 - t))
 	var distance      := muzzle_pos.distance_to(aim_pos)
 	var cone_radius   := tan(cone_half_rad) * distance
 	var rand_r        := sqrt(randf()) * cone_radius
 	var rand_theta    := randf() * TAU
 	aim_pos += Vector3(rand_r * cos(rand_theta), 0.0, rand_r * sin(rand_theta))
+	print("[ZEZLAN FIRE] aim_t=%.2f cone_deg=%.1f cone_radius=%.1f dist=%.1f muzzle=%s aimed_at=%s" % [
+		t, rad_to_deg(cone_half_rad), cone_radius, distance, _fmt_vec(muzzle_pos), _fmt_vec(aim_pos)
+	])
 
 	var fire_sfx := AudioStreamPlayer3D.new()
 	fire_sfx.stream = _CANNON_FIRE_STREAM
@@ -533,7 +528,7 @@ func _collect_mesh_instances(node: Node, out: Array[MeshInstance3D]) -> void:
 		_collect_mesh_instances(child, out)
 
 func _add_mesh_collider(mesh_instance: MeshInstance3D) -> void:
-	var shape := mesh_instance.mesh.create_trimesh_shape()
+	var shape := mesh_instance.mesh.create_convex_shape()
 	if not shape:
 		if collision_debug_enabled:
 			print("[ZEZLAN COLLISION] skipped mesh=", mesh_instance.name, " reason=create_trimesh_shape returned null")
