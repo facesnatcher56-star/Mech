@@ -284,6 +284,7 @@ mesh = SubResource("SphereMesh_ref")
 
 [node name="REF_Charlie" type="Marker3D" parent="." unique_id=757398534]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.551174, 5.7967386, 152.18726)
+visible = false
 gizmo_extents = 0.5
 
 [node name="Dot" type="MeshInstance3D" parent="REF_Charlie" unique_id=1921384776]
@@ -294,8 +295,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.836662, 3.2, 119.67257)
 gizmo_extents = 2.0
 
 [node name="VisibleDragDot" type="MeshInstance3D" parent="AimCameraTarget" unique_id=3000002]
-mesh = SubResource("SphereMesh_aim_target")
 visible = false
+mesh = SubResource("SphereMesh_aim_target")
 
 [node name="WorldSetup" type="Node" parent="." unique_id=812988922]
 script = ExtResource("7_world_setup")
@@ -350,10 +351,10 @@ smoke_scale = 3.0
 particle_amount = 40
 
 [node name="Torso2" parent="WIPtestmech/Armature" parent_id_path=PackedInt32Array(1679724251, 359783737) index="1" unique_id=654991229]
-transform = Transform3D(0.99999976, 0, 0, 0, 0.9983545, 0.05733397, 0, -0.05733396, 0.9983546, 0.28354645, -0.09670848, -0.78216624)
+transform = Transform3D(0.99999976, 0, 0, 0, 0.99835443, 0.057333965, 0, -0.057333957, 0.99835455, 0.28354645, -0.09670848, -0.78216624)
 
 [node name="ShoulderR" parent="WIPtestmech/Armature/Torso2/TorsoR" parent_id_path=PackedInt32Array(1679724251, 1891064601) index="0" unique_id=696837719]
-transform = Transform3D(0.30074298, -0.95358914, 0.014828165, 0.9507702, 0.30100033, 0.073706724, -0.074749246, -0.008068612, 0.99716884, 5.9604645e-08, 0.45995998, 1.1920929e-07)
+transform = Transform3D(0.30074298, -0.95358914, 0.014828164, 0.95077014, 0.30100033, 0.07370672, -0.074749246, -0.008068612, 0.9971688, 5.9604645e-08, 0.45995998, 1.1920929e-07)
 
 [node name="GunArm" parent="WIPtestmech/Armature/Torso2/TorsoR/ShoulderR" index="0" unique_id=914604739]
 transform = Transform3D(0.797691, 0.28861302, -0.5295198, -0.56406015, 0.046410825, -0.8244283, -0.21336527, 0.95632035, 0.19981664, -2.6077032e-08, 0.2282031, -3.259629e-08)
@@ -391,7 +392,7 @@ transform = Transform3D(0.41181862, 0.895979, 0.16621366, -0.87424207, 0.3369958
 transform = Transform3D(0.05258519, 0.108316615, 0.9927272, 0.054754585, -0.99291766, 0.10543757, 0.99712676, 0.04881119, -0.058142994, 0, 0.28172442, -4.7683716e-07)
 
 [node name="LegR" parent="WIPtestmech/Armature/TorsoLowerR" parent_id_path=PackedInt32Array(1679724251, 583431586) index="0" unique_id=1696298831]
-transform = Transform3D(0.9960359, -0.08893473, -0.0016863609, 0.0048570707, 0.035447713, 0.9993596, -0.08881806, -0.99540585, 0.03573918, 4.7683716e-07, 0.25640202, -1.1920929e-07)
+transform = Transform3D(0.9960359, -0.08893472, -0.0016863609, 0.0048570707, 0.035447713, 0.9993596, -0.08881806, -0.9954058, 0.03573918, 4.7683716e-07, 0.25640202, -1.1920929e-07)
 
 [node name="FootR" parent="WIPtestmech/Armature/TorsoLowerR/LegR" index="0" unique_id=776964756]
 transform = Transform3D(0.91616416, -0.3997972, -0.028380089, 0.39979723, 0.90655696, 0.13533881, -0.02837991, -0.13533884, 0.9903928, 2.3841858e-07, 0.2732985, 0)
