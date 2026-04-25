@@ -10,27 +10,27 @@ var _last_pct: int = -1
 
 func _ready() -> void:
 	anchor_left   = 1.0
-	anchor_top    = 1.0
+	anchor_top    = 0.0
 	anchor_right  = 1.0
-	anchor_bottom = 1.0
-	offset_left   = -210.0
-	offset_top    = -120.0
-	offset_right  = -24.0
-	offset_bottom = -28.0
+	anchor_bottom = 0.0
+	offset_left   = -120.0
+	offset_top    = 20.0
+	offset_right  = -20.0
+	offset_bottom = 80.0
 	mouse_filter  = Control.MOUSE_FILTER_IGNORE
 
 	var vbox := VBoxContainer.new()
 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	vbox.alignment = BoxContainer.ALIGNMENT_END
-	vbox.add_theme_constant_override("separation", 6)
+	vbox.alignment = BoxContainer.ALIGNMENT_BEGIN
+	vbox.add_theme_constant_override("separation", 2)
 	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(vbox)
 
 	var title := Label.new()
-	title.text = "CRIT CHANCE"
+	title.text = "AIM CRIT BONUS"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_theme_font_size_override("font_size", 12)
+	title.add_theme_font_size_override("font_size", 9)
 	title.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75, 0.55))
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(title)
@@ -39,13 +39,22 @@ func _ready() -> void:
 	_pct_label.text = "20%"
 	_pct_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_pct_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_pct_label.add_theme_font_size_override("font_size", 54)
+	_pct_label.add_theme_font_size_override("font_size", 27)
 	_pct_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(_pct_label)
 
+	var sublabel := Label.new()
+	sublabel.text = "DECAYS TO BASE 5%"
+	sublabel.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	sublabel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sublabel.add_theme_font_size_override("font_size", 8)
+	sublabel.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6, 0.4))
+	sublabel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(sublabel)
+
 	# Window timer bar
 	var bar_container := Control.new()
-	bar_container.custom_minimum_size = Vector2(0, 6)
+	bar_container.custom_minimum_size = Vector2(0, 3)
 	bar_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(bar_container)
