@@ -2,16 +2,15 @@ extends Node
 
 const AMMO_KEYS = ["STANDARD", "AP", "HE", "INCENDIARY", "SHRAPNEL", "CONCUSSION", "BREACH"]
 
-# Initial ammo counts
-# -1 means infinite
+# -1 means infinite, 0 means locked until earned from rewards
 var ammo_counts: Dictionary = {
 	"STANDARD": -1,
-	"AP": 10,
-	"HE": 8,
-	"INCENDIARY": 6,
-	"SHRAPNEL": 5,
-	"CONCUSSION": 4,
-	"BREACH": 5
+	"AP": 0,
+	"HE": 0,
+	"INCENDIARY": 0,
+	"SHRAPNEL": 0,
+	"CONCUSSION": 0,
+	"BREACH": 0,
 }
 
 func get_ammo_count(key: String) -> int:
@@ -38,12 +37,12 @@ func add_ammo(key: String, amount: int) -> void:
 func reset_ammo() -> void:
 	ammo_counts = {
 		"STANDARD": -1,
-		"AP": 10,
-		"HE": 8,
-		"INCENDIARY": 6,
-		"SHRAPNEL": 5,
-		"CONCUSSION": 4,
-		"BREACH": 5
+		"AP": 0,
+		"HE": 0,
+		"INCENDIARY": 0,
+		"SHRAPNEL": 0,
+		"CONCUSSION": 0,
+		"BREACH": 0,
 	}
 
 # ── Player HP ─────────────────────────────────────────────────────────────────
