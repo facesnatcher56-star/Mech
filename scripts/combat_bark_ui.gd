@@ -90,6 +90,27 @@ var concussion_hit_lines = [
 	"Zezlan's aim cycle slipped!", "Good tempo hit!", "Keep them delayed!"
 ]
 
+var shrapnel_hit_lines = [
+	"Shrapnel hit! Fragments spread!", "Multiple impacts!", "That peppered the frame!",
+	"Fragments walked across the armor!", "Good spread pattern!", "Shrapnel tore into the lower body!",
+	"That hit more than one section!", "Fragment damage confirmed!", "Good coverage!",
+	"That sprayed the chassis!", "Frame's full of holes!", "Lots of small bites!",
+	"That chewed the outside up!", "Good scatter hit!", "Fragments found metal!"
+]
+
+var breach_hit_lines = [
+	"Breach hit! Mark that plate!", "Armor cracked — hit it again!", "That opened a seam!",
+	"Breach charge set!", "Next hit there will hurt!", "Good crack in the armor!",
+	"That section is exposed!", "Repeat that shot!", "Same spot, send another!",
+	"Armor weakness created!", "That plate's compromised!", "Follow-up shot is primed!",
+	"Hit that breach before it settles!", "Good setup hit!", "That made a hole. Use it!"
+]
+
+var breach_followup_lines = [
+	"Breach exploited!", "That follow-up punched through!", "Same spot paid off!",
+	"Armor gave way!", "Beautiful follow-up!", "Crack turned into a rupture!"
+]
+
 # ── Interface ─────────────────────────────────────────────────────────────────
 
 func _ready():
@@ -113,14 +134,14 @@ func show_commit():
 	label.text = commit_lines.pick_random()
 	_fade_in()
 
-func show_result(is_hit: bool, body_part_name: String = "", ammo_key: String = "") -> void:
+func show_result(is_hit: bool, body_part_name: String = "", ammo_key: String = "", triggered_crack: bool = false) -> void:
 	if is_high_priority_active: return
 	if not is_hit:
 		label.text = miss_lines.pick_random()
 		return
 
 	# Ammo-specific barks always take priority on a hit
-	var ammo_bark := _get_ammo_bark(ammo_key, body_part_name)
+	var ammo_bark := _get_ammo_bark(ammo_key, body_part_name, triggered_crack)
 	if ammo_bark != "":
 		label.text = ammo_bark
 		_fade_in()
@@ -155,7 +176,7 @@ func hide_bark():
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-func _get_ammo_bark(ammo_key: String, part_name: String) -> String:
+func _get_ammo_bark(ammo_key: String, part_name: String, triggered_crack: bool = false) -> String:
 	match ammo_key:
 		"STANDARD":
 			return standard_hit_lines.pick_random()
@@ -171,6 +192,12 @@ func _get_ammo_bark(ammo_key: String, part_name: String) -> String:
 			return incendiary_hit_lines.pick_random()
 		"CONCUSSION":
 			return concussion_hit_lines.pick_random()
+		"SHRAPNEL":
+			return shrapnel_hit_lines.pick_random()
+		"BREACH":
+			if triggered_crack:
+				return breach_followup_lines.pick_random()
+			return breach_hit_lines.pick_random()
 	return ""
 
 func _normalize_part_name(part_name: String) -> String:

@@ -276,6 +276,7 @@ func apply_shell_damage(hit_body: Node, hit_pos: Vector3, profile: Dictionary = 
 		"part_key": part_key,
 		"part_broken": part_broken,
 		"destroyed": is_destroyed,
+		"triggered_crack": triggered_crack,
 		"snapshot": snapshot
 	}
 
