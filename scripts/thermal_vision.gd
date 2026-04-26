@@ -21,10 +21,11 @@ func _ready() -> void:
 	add_child(_overlay)
 
 	# SubViewport that only renders Zezlan (layer 2)
+	# Always updating so the texture is never uninitialized/white
 	_subviewport = SubViewport.new()
 	_subviewport.name = "ThermalSubViewport"
 	_subviewport.transparent_bg = true
-	_subviewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	_subviewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	_subviewport.size = Vector2i(get_viewport().get_visible_rect().size)
 	get_tree().root.add_child(_subviewport)
 
@@ -71,9 +72,6 @@ func _process(_delta: float) -> void:
 func toggle() -> void:
 	_active = not _active
 	_overlay.visible = _active
-	_subviewport.render_target_update_mode = (
-		SubViewport.UPDATE_ALWAYS if _active else SubViewport.UPDATE_DISABLED
-	)
 
 func is_active() -> bool:
 	return _active
