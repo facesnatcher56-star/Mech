@@ -36,6 +36,12 @@ func _setup_subviewport() -> void:
 
 	_tag_zezlan_meshes()
 
+	# Tag any projectile that enters the scene from now on
+	get_tree().node_added.connect(func(node: Node) -> void:
+		if node.name == "TracerShell":
+			_tag_recursive.call_deferred(node)
+	)
+
 	(_overlay.material as ShaderMaterial).set_shader_parameter(
 		"zezlan_texture", _subviewport.get_texture()
 	)
