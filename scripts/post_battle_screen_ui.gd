@@ -1,16 +1,35 @@
 extends Control
 
 const AMMO_POOL := [
-	{"key": "AP",         "label": "ARMOR-PIERCING", "color": Color(1.0, 0.75, 0.2)},
-	{"key": "HE",         "label": "HIGH-EXPLOSIVE",  "color": Color(1.0, 0.35, 0.15)},
-	{"key": "INCENDIARY", "label": "INCENDIARY",       "color": Color(1.0, 0.15, 0.05)},
-	{"key": "SHRAPNEL",   "label": "SHRAPNEL",         "color": Color(0.7, 0.7, 0.9)},
-	{"key": "CONCUSSION", "label": "CONCUSSION",       "color": Color(0.4, 0.85, 1.0)},
-	{"key": "BREACH",     "label": "BREACH",           "color": Color(0.9, 0.5, 1.0)},
+	{
+		"key": "AP", "label": "ARMOR-PIERCING", "color": Color(1.0, 0.75, 0.2),
+		"desc": "A narrow-bodied penetrator forged for killing machines through their thickest plates. It does not explode for spectacle; it finds a seam, bites through armor, and leaves the damage where repairs are hardest."
+	},
+	{
+		"key": "HE", "label": "HIGH-EXPLOSIVE", "color": Color(1.0, 0.35, 0.15),
+		"desc": "A brute-force demolition round packed to break frames, joints, and support structure. It does not care about elegance — it hits, blooms outward, and makes the whole machine answer for one bad impact."
+	},
+	{
+		"key": "INCENDIARY", "label": "INCENDIARY", "color": Color(1.0, 0.15, 0.05),
+		"desc": "A cruel thermal charge that trades instant destruction for lingering ruin. It slips fire into seams, joints, and open wounds, turning armor into an oven and damaged parts into liabilities."
+	},
+	{
+		"key": "SHRAPNEL", "label": "SHRAPNEL", "color": Color(0.7, 0.7, 0.9),
+		"desc": "A fragmentation round filled with ugly little answers to exposed armor. One shell becomes a storm of metal, chewing across plates, cables, joints, and anything unlucky enough to be outside the main hull."
+	},
+	{
+		"key": "CONCUSSION", "label": "CONCUSSION", "color": Color(0.4, 0.85, 1.0),
+		"desc": "A shock round designed to beat the rhythm out of enemy machinery. Its blast hammers sensors, crew, mounts, and timing gear — not always killing fast, but making the next enemy shot come late or wrong."
+	},
+	{
+		"key": "BREACH", "label": "BREACH", "color": Color(0.9, 0.5, 1.0),
+		"desc": "A specialist cracking charge made to open the door for the next shot. It weakens armor instead of finishing the job, marking one section of the enemy machine for a follow-up hit that hurts far worse."
+	},
 ]
 
 var _progress_bar: ProgressBar
 var _continue_btn: Button
+var _desc_label: Label
 var _loading_path: String = "res://scenes/main.tscn"
 var _is_loading: bool = false
 var _rewards: Array = []
@@ -32,7 +51,7 @@ func _ready() -> void:
 	add_child(center)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 40)
+	vbox.add_theme_constant_override("separation", 32)
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	center.add_child(vbox)
 
@@ -60,6 +79,27 @@ func _ready() -> void:
 		var card := _make_card(i, _rewards[i])
 		hbox.add_child(card)
 		_card_buttons.append(card)
+
+	# Description panel — updates on hover
+	var desc_container := PanelContainer.new()
+	desc_container.custom_minimum_size = Vector2(620, 70)
+	var desc_style := StyleBoxFlat.new()
+	desc_style.bg_color = Color(0.07, 0.07, 0.09, 0.9)
+	desc_style.set_border_width_all(1)
+	desc_style.border_color = Color(0.25, 0.25, 0.3, 0.5)
+	desc_style.set_corner_radius_all(4)
+	desc_style.set_content_margin_all(14)
+	desc_container.add_theme_stylebox_override("panel", desc_style)
+	vbox.add_child(desc_container)
+
+	_desc_label = Label.new()
+	_desc_label.text = ""
+	_desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_desc_label.add_theme_font_size_override("font_size", 13)
+	_desc_label.add_theme_color_override("font_color", Color(0.72, 0.72, 0.72, 0.85))
+	_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_desc_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	desc_container.add_child(_desc_label)
 
 	_continue_btn = Button.new()
 	_continue_btn.name = "ContinueButton"
@@ -163,7 +203,19 @@ func _make_card(index: int, reward: Dictionary) -> Button:
 	inner.add_child(shells_label)
 
 	btn.pressed.connect(_on_card_pressed.bind(index))
+	btn.mouse_entered.connect(_on_card_hovered.bind(index))
+	btn.mouse_exited.connect(_on_card_unhovered)
 	return btn
+
+func _on_card_hovered(index: int) -> void:
+	if _desc_label:
+		_desc_label.text = _rewards[index].get("desc", "")
+
+func _on_card_unhovered() -> void:
+	if _desc_label and _selected_index >= 0:
+		_desc_label.text = _rewards[_selected_index].get("desc", "")
+	elif _desc_label:
+		_desc_label.text = ""
 
 func _on_card_pressed(index: int) -> void:
 	_selected_index = index
