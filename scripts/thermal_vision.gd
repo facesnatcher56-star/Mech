@@ -11,7 +11,6 @@ var _active: bool = false
 func _ready() -> void:
 	layer = 10
 
-	# Fullscreen overlay with shader
 	_overlay = ColorRect.new()
 	_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_overlay.material = ShaderMaterial.new()
@@ -20,8 +19,10 @@ func _ready() -> void:
 	_overlay.visible = false
 	add_child(_overlay)
 
-	# SubViewport that only renders Zezlan (layer 2)
-	# Always updating so the texture is never uninitialized/white
+	# Defer subviewport setup — root is busy during _ready
+	call_deferred("_setup_subviewport")
+
+func _setup_subviewport() -> void:
 	_subviewport = SubViewport.new()
 	_subviewport.name = "ThermalSubViewport"
 	_subviewport.transparent_bg = true
@@ -33,11 +34,8 @@ func _ready() -> void:
 	_thermal_cam.cull_mask = ZEZLAN_LAYER_MASK
 	_subviewport.add_child(_thermal_cam)
 
-	# Deferred so the scene is fully loaded before we walk Zezlan's tree
-	call_deferred("_tag_zezlan_meshes")
-	call_deferred("_bind_shader_texture")
+	_tag_zezlan_meshes()
 
-func _bind_shader_texture() -> void:
 	(_overlay.material as ShaderMaterial).set_shader_parameter(
 		"zezlan_texture", _subviewport.get_texture()
 	)
@@ -53,18 +51,16 @@ func _tag_recursive(node: Node) -> void:
 		_tag_recursive(child)
 
 func _process(_delta: float) -> void:
-	if not _active:
+	if not _active or not is_instance_valid(_thermal_cam):
 		return
 
-	# Keep thermal cam in sync with whichever camera is active
 	var main_cam := get_viewport().get_camera_3d()
 	if main_cam and is_instance_valid(main_cam):
 		_thermal_cam.global_transform = main_cam.global_transform
-		_thermal_cam.fov   = main_cam.fov
-		_thermal_cam.near  = main_cam.near
-		_thermal_cam.far   = main_cam.far
+		_thermal_cam.fov  = main_cam.fov
+		_thermal_cam.near = main_cam.near
+		_thermal_cam.far  = main_cam.far
 
-	# Match viewport size if window was resized
 	var vp_size := Vector2i(get_viewport().get_visible_rect().size)
 	if _subviewport.size != vp_size:
 		_subviewport.size = vp_size
