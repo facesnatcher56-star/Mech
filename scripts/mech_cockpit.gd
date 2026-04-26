@@ -694,6 +694,16 @@ func _input(event):
 			ammo_wheel_ui.open()
 			return
 
+	if event is InputEventKey and event.keycode == KEY_O and event.pressed and not event.echo:
+		if not is_dead:
+			var smoke := get_tree().current_scene.find_child("SmokeScreen", true, false) as Node
+			if smoke and smoke.has_method("is_active"):
+				if smoke.is_active():
+					smoke.dismiss()
+				else:
+					smoke.deploy()
+		return
+
 	if event is InputEventMouseMotion and combat_view_flow_controller.combat_view_state == CombatViewState.NORMAL_VIEW and not is_reloading and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if main_camera_controller and main_camera_controller.has_method("handle_orbit_motion"):
 			main_camera_controller.handle_orbit_motion(event.relative, mouse_sensitivity)
