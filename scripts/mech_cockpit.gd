@@ -21,6 +21,7 @@ const VICTORY_CINEMATIC_CONTROLLER = preload("res://scripts/victory_cinematic_co
 const AMMO_WHEEL_UI = preload("res://scripts/ammo_wheel_ui.gd")
 const POST_BATTLE_SCREEN_UI = preload("res://scripts/post_battle_screen_ui.gd")
 const CRIT_CHANCE_HUD = preload("res://scripts/crit_chance_hud.gd")
+const THERMAL_VISION = preload("res://scripts/thermal_vision.gd")
 
 enum CombatViewState { NORMAL_VIEW, GUN_CAM_VIEW, ANALOG_AIM_VIEW, FIRING_FROM_FIRE_CAM }
 
@@ -209,6 +210,7 @@ var combat_view_flow_controller: Node = null
 var victory_cinematic_controller: Node = null
 var ammo_wheel_ui: Control = null
 var crit_chance_hud: Control = null
+var thermal_vision: CanvasLayer = null
 
 func _ready():
 	add_to_group("player")
@@ -241,6 +243,7 @@ func _ready():
 	call_deferred("_setup_victory_cinematic_controller")
 	call_deferred("_setup_ammo_wheel")
 	call_deferred("_setup_crit_hud")
+	_setup_thermal_vision()
 
 func _setup_analog_heartbeat_controller() -> void:
 	analog_heartbeat_controller = ANALOG_HEARTBEAT_CONTROLLER.new()
@@ -477,6 +480,11 @@ func _setup_crit_hud() -> void:
 				crit_chance_hud.update_crit(crit)
 		)
 
+func _setup_thermal_vision() -> void:
+	thermal_vision = THERMAL_VISION.new()
+	thermal_vision.name = "ThermalVision"
+	add_child(thermal_vision)
+
 func _setup_victory_cinematic_controller() -> void:
 	var canvas_layer = get_node_or_null("CanvasLayer")
 	victory_cinematic_controller = VICTORY_CINEMATIC_CONTROLLER.new()
@@ -693,6 +701,11 @@ func _input(event):
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 			ammo_wheel_ui.open()
 			return
+
+	if event is InputEventKey and event.keycode == KEY_T and event.pressed and not event.echo:
+		if thermal_vision:
+			thermal_vision.toggle()
+		return
 
 	if event is InputEventKey and event.keycode == KEY_O and event.pressed and not event.echo:
 		if not is_dead:
